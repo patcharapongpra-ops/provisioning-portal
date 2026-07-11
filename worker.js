@@ -90,6 +90,14 @@ export default {
         return await handleAdminResetPassword(request, env, user);
       }
 
+      if (url.pathname === "/admin/users/role") {
+        const user = await requireLogin(request, env);
+        if (!user) return redirect(request, "/login");
+        if (user.role !== "admin") return redirect(request, "/home");
+        if (request.method !== "POST") return redirect(request, "/admin/users");
+        return await handleChangeUserRole(request, env, user);
+      }
+
       if (url.pathname === "/api/register") {
         if (request.method !== "POST") return redirect(request, "/register");
         return await handleRegister(request, env);
@@ -660,6 +668,39 @@ async function handleChangePassword(request, env, user) {
     .run();
 
   return redirect(request, "/account/password?success=1");
+}
+
+async function handleChangeUserRole(request, env, adminUser) {
+  const formData = await request.formData();
+  const userId = Number(String(formData.get("user_id") || "").trim());
+  const role = String(formData.get("role") || "").trim();
+
+  const allowedRoles = ["admin", "staff", "user"];
+
+  if (!userId || !allowedRoles.includes(role)) {
+    return redirect(request, "/admin/users?error=role");
+  }
+
+  // ห้ามเปลี่ยน role ตัวเอง — กัน admin คนสุดท้ายลดสิทธิ์ตัวเองจนไม่มีใครจัดการระบบได้
+  if (userId === Number(adminUser.id)) {
+    return redirect(request, "/admin/users?error=self");
+  }
+
+  const target = await env.DB
+    .prepare("SELECT id FROM users WHERE id = ? LIMIT 1")
+    .bind(userId)
+    .first();
+
+  if (!target) {
+    return redirect(request, "/admin/users?error=role");
+  }
+
+  await env.DB
+    .prepare("UPDATE users SET role = ? WHERE id = ?")
+    .bind(role, userId)
+    .run();
+
+  return redirect(request, "/admin/users?success=role");
 }
 
 async function handleAdminResetPassword(request, env, adminUser) {

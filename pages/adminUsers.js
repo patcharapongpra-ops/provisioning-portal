@@ -7,13 +7,31 @@ export function adminUsersPage(user, users, error, success, resetInfo) {
       const nextStatus = item.is_active ? 0 : 1;
       const buttonText = item.is_active ? "Disable" : "Enable";
       const statusText = item.is_active ? "Active" : "Disabled";
+      const isSelf = Number(item.id) === Number(user.id);
+
+      const roleCell = isSelf
+        ? `<span class="badge">${escapeHtml(item.role)}</span> <span class="muted" style="font-size:12px">(คุณ)</span>`
+        : `<form action="/admin/users/role" method="POST" class="inline-form">
+             <input type="hidden" name="user_id" value="${item.id}">
+             <div class="action-row" style="flex-wrap:nowrap">
+               <select name="role" class="filter-input" style="padding:6px 30px 6px 10px;font-size:13px">
+                 ${["user", "staff", "admin"]
+                   .map(
+                     (r) =>
+                       `<option value="${r}" ${item.role === r ? "selected" : ""}>${r}</option>`
+                   )
+                   .join("")}
+               </select>
+               <button class="small-btn" type="submit">บันทึก</button>
+             </div>
+           </form>`;
 
       return `
       <tr>
         <td>${item.id}</td>
         <td>${escapeHtml(item.username)}</td>
         <td>${escapeHtml(item.full_name)}</td>
-        <td><span class="badge">${escapeHtml(item.role)}</span></td>
+        <td>${roleCell}</td>
         <td>${statusText}</td>
         <td>${escapeHtml(item.created_at || "")}</td>
         <td>
@@ -155,6 +173,14 @@ function showMessage(error, success) {
 
   if (error === "reset") {
     return `<div class="alert error">ไม่สามารถรีเซ็ตรหัสผ่านได้ ไม่พบผู้ใช้ที่ต้องการ</div>`;
+  }
+
+  if (success === "role") {
+    return `<div class="alert success">เปลี่ยน role สำเร็จ</div>`;
+  }
+
+  if (error === "self") {
+    return `<div class="alert error">ไม่สามารถเปลี่ยน role ของตัวเองได้ ให้ admin คนอื่นเป็นผู้เปลี่ยน</div>`;
   }
 
   return "";
