@@ -13,7 +13,7 @@ import {
 } from "./planner.js";
 import { plannerBoardPage } from "./pages/plannerBoard.js";
 import { plannerJobFormPage } from "./pages/plannerJobForm.js";
-import { plannerJobViewPage } from "./pages/plannerJobView.js";
+import { plannerJobViewPage } from "./pages/plannerJob.js";
 import {
   loadBoard, loadOwners, loadActiveTypesGrouped, handleCreateJob,
   loadJobDetail, handleUpdateJob, handleToggleStep, handleAddStep,
