@@ -1,4 +1,5 @@
 import { mainStyle } from "../styles/main.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function adminTemplatesPage({ user, templates, error, success }) {
   const rows = (templates || [])
@@ -40,27 +41,16 @@ export function adminTemplatesPage({ user, templates, error, success }) {
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Template Manager - Provisioning Portal</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>Template Manager</h2>
-      <p>Admin: ${escapeHtml(user.full_name)}</p>
-    </div>
-
-    <nav class="nav">
-      <a href="/home">Home</a>
-      <a href="/admin">Admin</a>
-      <a href="/config">Config Generator</a>
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container">
+  <div class="app-shell">
+    ${renderSidebar(user, "admin-templates")}
+    <main class="container">
     <section class="hero">
       <h1>Config Templates</h1>
       <p>จัดการ Template สำหรับ Generate Config</p>
@@ -101,7 +91,8 @@ export function adminTemplatesPage({ user, templates, error, success }) {
         </tbody>
       </table>
     </section>
-  </main>
+    </main>
+  </div>
 </body>
 </html>
 `;

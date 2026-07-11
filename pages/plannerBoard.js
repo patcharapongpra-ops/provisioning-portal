@@ -1,5 +1,6 @@
 import { mainStyle } from "../styles/main.js";
 import { plannerAppScript } from "../plannerApp.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function plannerBoardPage({ user, jobs, categories, owners, filters, success }) {
   const senior = user.role === "staff" || user.role === "admin";
@@ -53,9 +54,9 @@ export function plannerBoardPage({ user, jobs, categories, owners, filters, succ
         <td>${escapeHtml(job.cr_close_date || "-")}</td>
         <td>
           <div style="display:flex;align-items:center;gap:8px">
-            <div style="flex:1;min-width:60px;height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden">
+            <div style="flex:1;min-width:60px;height:6px;background:var(--hairline-strong);border-radius:999px;overflow:hidden">
               <div style="width:${pct}%;height:100%;background:${
-        pct === 100 ? "#16a34a" : "#2563eb"
+        pct === 100 ? "var(--ok)" : "var(--accent)"
       }"></div>
             </div>
             <span class="muted" style="font-size:12px">${done}/${total}</span>
@@ -75,28 +76,16 @@ export function plannerBoardPage({ user, jobs, categories, owners, filters, succ
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Planner - บอร์ดงาน</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>Planner</h2>
-      <p>Welcome, ${escapeHtml(user.full_name)} (${escapeHtml(user.role)})</p>
-    </div>
-
-    <nav class="nav">
-      <a href="/home">Home</a>
-      <a href="/planner/calendar">ปฏิทิน</a>
-      <a href="/planner/dashboard">Dashboard</a>
-      <a href="/planner/types">คลังชนิดงาน</a>
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container wide-container" id="app" data-ajax>
+  <div class="app-shell">
+    ${renderSidebar(user, "planner-board")}
+    <main class="container wide-container" id="app" data-ajax>
     <section class="hero">
       <h1>บอร์ดงาน</h1>
       <p>${
@@ -111,19 +100,19 @@ export function plannerBoardPage({ user, jobs, categories, owners, filters, succ
     <section class="panel">
       <div class="panel-title-row">
         <form action="/planner" method="GET" class="action-row" style="flex-wrap:wrap;gap:10px">
-          <input name="q" type="text" placeholder="ค้นหา CID / ลูกค้า / SOF" value="${escapeHtml(
+          <input name="q" type="text" class="filter-input" placeholder="ค้นหา CID / ลูกค้า / SOF" value="${escapeHtml(
             filters.q || ""
-          )}" style="padding:9px 12px;border:1px solid #d1d5db;border-radius:10px">
-          <select name="category_id" style="padding:9px 12px;border:1px solid #d1d5db;border-radius:10px">
+          )}">
+          <select name="category_id" class="filter-input">
             <option value="">ทุกหมวด</option>
             ${categoryOptions}
           </select>
-          <select name="status" style="padding:9px 12px;border:1px solid #d1d5db;border-radius:10px">
+          <select name="status" class="filter-input">
             ${statusOptions}
           </select>
           ${
             senior
-              ? `<select name="owner_id" style="padding:9px 12px;border:1px solid #d1d5db;border-radius:10px">
+              ? `<select name="owner_id" class="filter-input">
                    <option value="">ทุกคน</option>${ownerOptions}
                  </select>`
               : ""
@@ -155,7 +144,8 @@ export function plannerBoardPage({ user, jobs, categories, owners, filters, succ
         </tbody>
       </table>
     </section>
-  </main>
+    </main>
+  </div>
   <script>${plannerAppScript()}</script>
 </body>
 </html>
@@ -164,13 +154,13 @@ export function plannerBoardPage({ user, jobs, categories, owners, filters, succ
 
 function statusBadge(status, overdue) {
   const map = {
-    todo: `<span class="badge badge-gray">ยังไม่เริ่ม</span>`,
-    in_progress: `<span class="badge">กำลังทำ</span>`,
-    done: `<span class="badge" style="background:#dcfce7;color:#166534">เสร็จ</span>`,
+    todo: `<span class="badge badge-todo">ยังไม่เริ่ม</span>`,
+    in_progress: `<span class="badge badge-progress">กำลังทำ</span>`,
+    done: `<span class="badge badge-done">เสร็จ</span>`,
   };
   const base = map[status] || map.todo;
   const flag = overdue
-    ? ` <span class="badge" style="background:#fee2e2;color:#991b1b">เลยกำหนด</span>`
+    ? ` <span class="badge badge-overdue">เลยกำหนด</span>`
     : "";
   return base + flag;
 }

@@ -1,4 +1,5 @@
 import { mainStyle } from "../styles/main.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function adminUsersPage(user, users, error, success) {
   const rows = users
@@ -31,26 +32,16 @@ export function adminUsersPage(user, users, error, success) {
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Manage Users - Provisioning Portal</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>Manage Users</h2>
-      <p>Admin: ${escapeHtml(user.full_name)}</p>
-    </div>
-
-    <nav class="nav">
-      <a href="/home">Home</a>
-      <a href="/admin">Admin</a>
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container">
+  <div class="app-shell">
+    ${renderSidebar(user, "admin-users")}
+    <main class="container">
     <section class="hero">
       <h1>Users</h1>
       <p>จัดการผู้ใช้งานในระบบ</p>
@@ -115,6 +106,7 @@ export function adminUsersPage(user, users, error, success) {
       </table>
     </section>
   </main>
+  </div>
 </body>
 </html>
 `;

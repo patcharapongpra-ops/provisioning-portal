@@ -1,5 +1,6 @@
 import { mainStyle } from "../styles/main.js";
 import { plannerAppScript } from "../plannerApp.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function plannerTypesPage({ user, categories, types, error, success }) {
   // group types by category (คงลำดับหมวดกลาง)
@@ -88,28 +89,16 @@ export function plannerTypesPage({ user, categories, types, error, success }) {
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>คลังชนิดงาน - Planner</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>คลังชนิดงาน</h2>
-      <p>${escapeHtml(user.full_name)}</p>
-    </div>
-
-    <nav class="nav">
-      <a href="/home">Home</a>
-      <a href="/planner">Planner</a>
-      <a href="/planner/calendar">ปฏิทิน</a>
-      <a href="/planner/dashboard">Dashboard</a>
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container" id="app" data-ajax>
+  <div class="app-shell">
+    ${renderSidebar(user, "planner-types")}
+    <main class="container" id="app" data-ajax>
     <section class="hero">
       <h1>คลังชนิดงาน + ขั้นตอน</h1>
       <p>ชนิดงานและขั้นตอนเหล่านี้เป็นของคุณคนเดียว ปรับแต่งได้อิสระ — เวลาสร้างงานจะดึงขั้นตอนจากที่นี่ไปเป็น checklist</p>
@@ -118,7 +107,8 @@ export function plannerTypesPage({ user, categories, types, error, success }) {
     ${showMessage(error, success)}
 
     ${sections}
-  </main>
+    </main>
+  </div>
   <script>${plannerAppScript()}</script>
 </body>
 </html>

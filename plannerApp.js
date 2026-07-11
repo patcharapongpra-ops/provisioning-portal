@@ -8,11 +8,11 @@
 export function plannerAppScript() {
   return `
 (function () {
-  var css = "#np-bar{position:fixed;top:0;left:0;height:3px;width:0;background:#2563eb;z-index:9999;transition:width .2s ease,opacity .3s ease;box-shadow:0 0 8px rgba(37,99,235,.6)}"
+  var css = "#np-bar{position:fixed;top:0;left:0;height:3px;width:0;background:var(--accent);z-index:9999;transition:width .2s ease,opacity .3s ease}"
     + "#np-toasts{position:fixed;top:16px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:8px}"
-    + ".np-toast{background:#111827;color:#fff;padding:11px 15px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(-6px);transition:opacity .2s,transform .2s;max-width:340px}"
+    + ".np-toast{background:var(--ink-surface);color:var(--ink-surface-text);padding:11px 15px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(-6px);transition:opacity .2s,transform .2s;max-width:340px}"
     + ".np-toast.show{opacity:1;transform:translateY(0)}"
-    + ".np-toast.ok{background:#166534}.np-toast.err{background:#991b1b}"
+    + ".np-toast.ok{background:var(--ok)}.np-toast.err{background:var(--danger)}"
     + "button.np-busy{opacity:.75;cursor:progress}";
   var st = document.createElement("style"); st.textContent = css; document.head.appendChild(st);
 

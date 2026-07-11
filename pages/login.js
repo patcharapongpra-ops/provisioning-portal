@@ -1,10 +1,12 @@
 import { mainStyle } from "../styles/main.js";
+import { themeInitScript } from "../layout.js";
 
 export function loginPage(error) {
   return `
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - Provisioning Portal</title>

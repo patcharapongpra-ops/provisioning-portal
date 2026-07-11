@@ -1,31 +1,21 @@
 import { mainStyle } from "../styles/main.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function homePage(user) {
   return `
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Home - Provisioning Portal</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>Provisioning Portal</h2>
-      <p>Welcome, ${escapeHtml(user.full_name)} (${escapeHtml(user.role)})</p>
-    </div>
-
-    <nav class="nav">
-      <a href="/home">Home</a>
-      <a href="/config">Config Generator</a>
-      ${user.role === "admin" ? `<a href="/admin">Admin</a>` : ""}
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container">
+  <div class="app-shell">
+    ${renderSidebar(user, "home")}
+    <main class="container">
     <section class="hero">
       <h1>Home</h1>
       <p>ศูนย์รวมเครื่องมือ เอกสาร คู่มือ และระบบ Generate Config ของแผนก</p>
@@ -63,7 +53,8 @@ export function homePage(user) {
           : ""
       }
     </section>
-  </main>
+    </main>
+  </div>
 </body>
 </html>
 `;

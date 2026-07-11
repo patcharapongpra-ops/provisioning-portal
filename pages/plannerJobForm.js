@@ -1,5 +1,6 @@
 import { mainStyle } from "../styles/main.js";
 import { plannerAppScript } from "../plannerApp.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function plannerJobFormPage({ user, typeGroups, error }) {
   const hasTypes = (typeGroups || []).some((g) => g.types.length > 0);
@@ -18,26 +19,16 @@ export function plannerJobFormPage({ user, typeGroups, error }) {
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>สร้างงาน - Planner</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>สร้างงาน</h2>
-      <p>${escapeHtml(user.full_name)}</p>
-    </div>
-
-    <nav class="nav">
-      <a href="/planner">Planner</a>
-      <a href="/planner/types">คลังชนิดงาน</a>
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container" id="app" data-ajax>
+  <div class="app-shell">
+    ${renderSidebar(user, "planner-board")}
+    <main class="container" id="app" data-ajax>
     <section class="hero">
       <h1>สร้างงานใหม่</h1>
       <p>เลือกชนิดงาน กรอกข้อมูลและวันสำคัญ — ขั้นตอนจะถูกดึงมาจากคลังของคุณเป็น checklist อัตโนมัติ</p>
@@ -120,7 +111,8 @@ export function plannerJobFormPage({ user, typeGroups, error }) {
     </section>
     `
     }
-  </main>
+    </main>
+  </div>
   <script>${plannerAppScript()}</script>
 </body>
 </html>

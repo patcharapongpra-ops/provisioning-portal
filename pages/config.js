@@ -1,4 +1,5 @@
 import { mainStyle } from "../styles/main.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function configPage({
   user,
@@ -72,27 +73,17 @@ export function configPage({
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Config Generator - Provisioning Portal</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>Config Generator</h2>
-      <p>Welcome, ${escapeHtml(user.full_name)} (${escapeHtml(user.role)})</p>
-    </div>
-
-    <nav class="nav">
-      <a href="/home">Home</a>
-      ${user.role === "admin" ? `<a href="/admin">Admin</a>` : ""}
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container">
-    <section class="hero dark-hero">
+  <div class="app-shell">
+    ${renderSidebar(user, "config")}
+    <main class="container">
+    <section class="hero">
       <h1>Config Generator</h1>
       <p>เลือก Template กรอกข้อมูล แล้วสร้าง Config ได้ทันที</p>
     </section>
@@ -162,7 +153,8 @@ export function configPage({
     `
         : ""
     }
-  </main>
+    </main>
+  </div>
 </body>
 </html>
 `;

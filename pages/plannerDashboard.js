@@ -1,5 +1,6 @@
 import { mainStyle } from "../styles/main.js";
 import { plannerAppScript } from "../plannerApp.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function plannerDashboardPage({ user, data, owners, filters }) {
   const m = data.metrics;
@@ -21,10 +22,10 @@ export function plannerDashboardPage({ user, data, owners, filters }) {
           (c) => `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
           <span style="width:110px;font-size:13px">${escapeHtml(c.name)}</span>
-          <div style="flex:1;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden">
+          <div style="flex:1;height:8px;background:var(--hairline-strong);border-radius:999px;overflow:hidden">
             <div style="width:${Math.round(
               (c.count / maxCat) * 100
-            )}%;height:100%;background:#2563eb"></div>
+            )}%;height:100%;background:var(--accent)"></div>
           </div>
           <span class="muted" style="font-size:12px">${c.count}</span>
         </div>`
@@ -36,8 +37,8 @@ export function plannerDashboardPage({ user, data, owners, filters }) {
     ? data.thisWeek
         .map(
           (w) => `
-        <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:13px">
-          <a href="/planner/jobs/view?id=${w.id}" style="color:#2563eb;text-decoration:none">${escapeHtml(
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--hairline);font-size:13px">
+          <a href="/planner/jobs/view?id=${w.id}" style="color:var(--accent);text-decoration:none">${escapeHtml(
             w.cid || "-"
           )} · ${escapeHtml(w.customer_name || "")}</a>
           <span class="muted">${escapeHtml(w.label)} ${escapeHtml(w.date)}</span>
@@ -53,10 +54,10 @@ export function plannerDashboardPage({ user, data, owners, filters }) {
           (o) => `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
           <span style="width:110px;font-size:13px">${escapeHtml(o.name)}</span>
-          <div style="flex:1;height:8px;background:#e5e7eb;border-radius:999px;overflow:hidden">
+          <div style="flex:1;height:8px;background:var(--hairline-strong);border-radius:999px;overflow:hidden">
             <div style="width:${Math.round(
               (o.total / maxOwner) * 100
-            )}%;height:100%;background:#2563eb"></div>
+            )}%;height:100%;background:var(--accent)"></div>
           </div>
           <span class="muted" style="font-size:12px">${o.done}/${o.total}</span>
         </div>`
@@ -68,28 +69,16 @@ export function plannerDashboardPage({ user, data, owners, filters }) {
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard - Planner</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>Dashboard</h2>
-      <p>Welcome, ${escapeHtml(user.full_name)} (${escapeHtml(user.role)})</p>
-    </div>
-
-    <nav class="nav">
-      <a href="/home">Home</a>
-      <a href="/planner">Planner</a>
-      <a href="/planner/calendar">ปฏิทิน</a>
-      <a href="/planner/types">คลังชนิดงาน</a>
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container" id="app" data-ajax>
+  <div class="app-shell">
+    ${renderSidebar(user, "planner-dashboard")}
+    <main class="container" id="app" data-ajax>
     <section class="hero">
       <div class="panel-title-row">
         <div>
@@ -99,7 +88,7 @@ export function plannerDashboardPage({ user, data, owners, filters }) {
         ${
           senior
             ? `<form action="/planner/dashboard" method="GET" class="action-row">
-                 <select name="owner_id" style="padding:9px 12px;border:1px solid #d1d5db;border-radius:10px">
+                 <select name="owner_id" class="filter-input">
                    <option value="">ทุกคน</option>${ownerOptions}
                  </select>
                  <button class="small-btn" type="submit">ดู</button>
@@ -110,9 +99,9 @@ export function plannerDashboardPage({ user, data, owners, filters }) {
     </section>
 
     <section class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
-      ${kpi("งานทั้งหมด", m.total, "#111827")}
-      ${kpi("กำลังทำ", m.in_progress, "#2563eb")}
-      ${kpi("เสร็จเดือนนี้", m.doneThisMonth, "#16a34a")}
+      ${kpi("งานทั้งหมด", m.total)}
+      ${kpi("กำลังทำ", m.in_progress)}
+      ${kpi("เสร็จเดือนนี้", m.doneThisMonth)}
       ${kpiDanger("เลยกำหนด", m.overdue)}
     </section>
 
@@ -134,26 +123,27 @@ export function plannerDashboardPage({ user, data, owners, filters }) {
            </section>`
         : ""
     }
-  </main>
+    </main>
+  </div>
   <script>${plannerAppScript()}</script>
 </body>
 </html>
 `;
 }
 
-function kpi(label, value, color) {
+function kpi(label, value) {
   return `
     <div class="card">
-      <p class="muted" style="font-size:13px;margin:0 0 6px">${label}</p>
-      <p style="font-size:28px;font-weight:800;margin:0;color:${color}">${value}</p>
+      <p class="muted" style="font-size:12.5px;margin:0 0 6px">${label}</p>
+      <p class="value">${value}</p>
     </div>`;
 }
 
 function kpiDanger(label, value) {
   return `
-    <div class="card" style="background:#fef2f2">
-      <p style="font-size:13px;margin:0 0 6px;color:#991b1b">${label}</p>
-      <p style="font-size:28px;font-weight:800;margin:0;color:#dc2626">${value}</p>
+    <div class="card">
+      <p class="muted" style="font-size:12.5px;margin:0 0 6px">${label}</p>
+      <p class="value" style="color:var(--danger)">${value}</p>
     </div>`;
 }
 

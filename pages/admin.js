@@ -1,30 +1,21 @@
 import { mainStyle } from "../styles/main.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function adminPage(user) {
   return `
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin - Provisioning Portal</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>Admin Dashboard</h2>
-      <p>Welcome, ${escapeHtml(user.full_name)}</p>
-    </div>
-
-    <nav class="nav">
-      <a href="/home">Home</a>
-      <a href="/config">Config Generator</a>
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container">
+  <div class="app-shell">
+    ${renderSidebar(user, "admin-overview")}
+    <main class="container">
     <section class="hero">
       <h1>Admin Dashboard</h1>
       <p>จัดการผู้ใช้งานและ Config Template</p>
@@ -51,7 +42,8 @@ export function adminPage(user) {
         <p>กลับไปหน้าหลักของพอร์ทัล</p>
       </a>
     </section>
-  </main>
+    </main>
+  </div>
 </body>
 </html>
 `;

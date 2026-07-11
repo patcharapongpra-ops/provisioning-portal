@@ -1,5 +1,6 @@
 import { mainStyle } from "../styles/main.js";
 import { plannerAppScript } from "../plannerApp.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function plannerTypeFormPage({ user, mode, type, categories, steps, error, presetCategoryId }) {
   const isEdit = mode === "edit";
@@ -31,26 +32,16 @@ export function plannerTypeFormPage({ user, mode, type, categories, steps, error
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${pageTitle} - Planner</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>${pageTitle}</h2>
-      <p>${escapeHtml(user.full_name)}</p>
-    </div>
-
-    <nav class="nav">
-      <a href="/planner/types">คลังชนิดงาน</a>
-      <a href="/planner">Planner</a>
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container" id="app">
+  <div class="app-shell">
+    ${renderSidebar(user, "planner-types")}
+    <main class="container" id="app">
     <section class="hero">
       <h1>${pageTitle}</h1>
       <p>เลือกหมวด ตั้งชื่อชนิดงาน แล้วกำหนดขั้นตอน (checklist) ที่จะถูก copy ไปทุกครั้งที่สร้างงานชนิดนี้</p>
@@ -244,6 +235,7 @@ export function plannerTypeFormPage({ user, mode, type, categories, steps, error
 
     renderInitialSteps();
   </script>
+  </div>
   <script>${plannerAppScript()}</script>
 </body>
 </html>

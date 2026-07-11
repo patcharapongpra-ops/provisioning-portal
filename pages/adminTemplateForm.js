@@ -1,4 +1,5 @@
 import { mainStyle } from "../styles/main.js";
+import { renderSidebar, themeInitScript } from "../layout.js";
 
 export function adminTemplateFormPage({ user, mode, template, fields, error }) {
   const isEdit = mode === "edit";
@@ -24,26 +25,16 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
 <!DOCTYPE html>
 <html lang="th">
 <head>
+  ${themeInitScript()}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${isEdit ? "แก้ไข" : "สร้าง"} Template - Config</title>
   <style>${mainStyle()}</style>
 </head>
 <body>
-  <header class="topbar">
-    <div>
-      <h2>${isEdit ? "แก้ไข" : "สร้าง"} Config Template</h2>
-      <p>Admin: ${escapeHtml(user.full_name)}</p>
-    </div>
-    <nav class="nav">
-      <a href="/admin/templates">Templates</a>
-      <a href="/admin">Admin</a>
-      <a href="/config">Config Generator</a>
-      <a href="/logout">Logout</a>
-    </nav>
-  </header>
-
-  <main class="container wide-container">
+  <div class="app-shell">
+    ${renderSidebar(user, "admin-templates")}
+    <main class="container wide-container">
     <section class="hero">
       <h1>${isEdit ? "แก้ไข Template" : "สร้าง Template"}</h1>
       <p>แปะ config จริงลงไป แล้วลากคลุมคำที่อยากให้เปลี่ยนค่า เลือกว่าจะให้ user กรอกเอง หรือดึงจากช่องอื่น (เช่น IP +1)</p>
@@ -445,7 +436,8 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
       renderList();
       renderPreview();
     </script>
-  </main>
+    </main>
+  </div>
 </body>
 </html>
 `;
