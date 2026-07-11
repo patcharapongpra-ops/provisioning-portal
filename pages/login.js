@@ -48,6 +48,10 @@ function showMessage(error, success) {
     return `<div class="alert error">บัญชีของคุณยังไม่ถูกอนุมัติ กรุณาติดต่อผู้ดูแลระบบ</div>`;
   }
 
+  if (error === "locked") {
+    return `<div class="alert error">ใส่รหัสผิดหลายครั้งเกินไป — ถูกล็อกชั่วคราว 15 นาที</div>`;
+  }
+
   if (error === "invalid") {
     return `<div class="alert error">Username หรือ Password ไม่ถูกต้อง</div>`;
   }

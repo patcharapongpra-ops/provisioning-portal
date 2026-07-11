@@ -38,6 +38,22 @@ import { hashPassword, verifyPassword, hashTempPassword, generateTempPassword } 
 
 export default {
   async fetch(request, env, ctx) {
+    const response = await handleRequest(request, env, ctx);
+    return withSecurityHeaders(response);
+  },
+};
+
+// ใส่ทุก response: กัน clickjacking (X-Frame-Options), กัน browser เดา content-type,
+// และไม่ส่ง referrer ออกนอกเว็บ
+function withSecurityHeaders(response) {
+  const headers = new Headers(response.headers);
+  headers.set("X-Frame-Options", "DENY");
+  headers.set("X-Content-Type-Options", "nosniff");
+  headers.set("Referrer-Policy", "same-origin");
+  return new Response(response.body, { status: response.status, headers });
+}
+
+async function handleRequest(request, env, ctx) {
     const url = new URL(request.url);
 
     try {
@@ -617,15 +633,26 @@ if (url.pathname === "/admin/holidays/delete") {
 
       return new Response("Not Found", { status: 404 });
     } catch (err) {
-      return new Response("Worker Error: " + err.message, {
+      // log รายละเอียดจริงไว้ดูฝั่ง Cloudflare (wrangler tail / dashboard)
+      // แต่ตอบผู้ใช้ด้วยข้อความกลางๆ ไม่เผยโครงสร้างภายใน
+      console.error("Worker error:", err && err.stack ? err.stack : err);
+      return new Response("เกิดข้อผิดพลาดในระบบ กรุณาลองใหม่อีกครั้ง", {
         status: 500,
         headers: {
           "Content-Type": "text/plain; charset=UTF-8",
         },
       });
     }
-  },
-};
+}
+
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_LOCK_MINUTES = 15;
+
+// แปลงเป็นรูปแบบเดียวกับ datetime('now') ของ SQLite ("YYYY-MM-DD HH:MM:SS" UTC)
+// เพื่อให้เทียบกันได้ตรงๆ ใน query
+function sqliteNow(offsetMs = 0) {
+  return new Date(Date.now() + offsetMs).toISOString().slice(0, 19).replace("T", " ");
+}
 
 async function handleLogin(request, env) {
   if (!env.DB) throw new Error("D1 binding DB not found.");
@@ -638,6 +665,42 @@ async function handleLogin(request, env) {
     return redirect(request, "/login?error=missing");
   }
 
+  const attemptKey = username.toLowerCase();
+  const now = sqliteNow();
+
+  // rate limit: ใส่รหัสผิดครบ 5 ครั้ง → ล็อก 15 นาที
+  const attempt = await env.DB
+    .prepare("SELECT fail_count, locked_until FROM login_attempts WHERE username = ? LIMIT 1")
+    .bind(attemptKey)
+    .first();
+
+  if (attempt && attempt.locked_until && attempt.locked_until > now) {
+    return redirect(request, "/login?error=locked");
+  }
+
+  // ถ้าล็อกรอบก่อนหมดอายุแล้ว เริ่มนับใหม่
+  const prevCount =
+    attempt && !(attempt.locked_until && attempt.locked_until <= now)
+      ? Number(attempt.fail_count || 0)
+      : 0;
+
+  const recordFailure = async () => {
+    const count = prevCount + 1;
+    const lockedUntil =
+      count >= LOGIN_MAX_FAILS ? sqliteNow(LOGIN_LOCK_MINUTES * 60 * 1000) : null;
+
+    await env.DB
+      .prepare(
+        `INSERT INTO login_attempts (username, fail_count, locked_until, last_attempt_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(username) DO UPDATE SET fail_count = ?, locked_until = ?, last_attempt_at = ?`
+      )
+      .bind(attemptKey, count, lockedUntil, now, count, lockedUntil, now)
+      .run();
+
+    return redirect(request, count >= LOGIN_MAX_FAILS ? "/login?error=locked" : "/login?error=invalid");
+  };
+
   const user = await env.DB
     .prepare(
       "SELECT id, username, full_name, role, password, is_active FROM users WHERE username = ? COLLATE NOCASE LIMIT 1"
@@ -646,18 +709,26 @@ async function handleLogin(request, env) {
     .first();
 
   if (!user) {
-    return redirect(request, "/login?error=invalid");
+    return await recordFailure();
   }
 
   const result = await verifyPassword(password, user.password);
   if (!result.ok) {
-    return redirect(request, "/login?error=invalid");
+    return await recordFailure();
   }
 
   // บอกสถานะ "รออนุมัติ" เฉพาะเมื่อรหัสถูกต้อง เพื่อไม่เปิดเผยสถานะบัญชีให้คนเดารหัส
   if (user.is_active !== 1) {
     return redirect(request, "/login?error=pending");
   }
+
+  // login สำเร็จ: ล้างตัวนับ + housekeeping ลบ session หมดอายุ / attempt เก่าเกิน 1 วัน
+  await env.DB.prepare("DELETE FROM login_attempts WHERE username = ?").bind(attemptKey).run();
+  await env.DB.prepare("DELETE FROM sessions WHERE expires_at <= datetime('now')").run();
+  await env.DB
+    .prepare("DELETE FROM login_attempts WHERE last_attempt_at <= ?")
+    .bind(sqliteNow(-24 * 60 * 60 * 1000))
+    .run();
 
   // lazy upgrade: ถ้ารหัสเดิมเป็น plaintext ให้ hash แล้วเขียนทับทันที
   if (result.legacy) {
@@ -669,7 +740,9 @@ async function handleLogin(request, env) {
   }
 
   const sessionId = crypto.randomUUID();
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 8).toISOString();
+  // รูปแบบเดียวกับ datetime('now') — เดิมเก็บ ISO (มี T) ทำให้เทียบกับ datetime('now')
+  // เพี้ยนและ session ฝั่ง server อยู่นานเกิน 8 ชม.
+  const expiresAt = sqliteNow(1000 * 60 * 60 * 8);
 
   await env.DB
     .prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)")
