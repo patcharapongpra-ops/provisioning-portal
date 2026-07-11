@@ -196,6 +196,26 @@ export async function loadCalendar(env, user, ownerId, ym) {
     push(Number(ev.event_date.slice(8, 10)), { id: ev.id, label: ev.title, kind: "personal" });
   }
 
+  // การจองรถ (ของกลาง ทุกคนเห็น) — วาดทุกวันที่การจองคาบเกี่ยว รองรับจองข้ามคืน
+  const carResult = await env.DB
+    .prepare(
+      `SELECT car_bookings.id, car_bookings.start_at, car_bookings.end_at,
+              users.full_name AS owner_name
+       FROM car_bookings JOIN users ON users.id = car_bookings.user_id
+       WHERE substr(car_bookings.start_at, 1, 10) <= ?
+         AND substr(car_bookings.end_at, 1, 10) >= ?`
+    )
+    .bind(end, start)
+    .all();
+
+  for (const b of carResult.results || []) {
+    const fromDate = b.start_at.slice(0, 10) < start ? start : b.start_at.slice(0, 10);
+    const toDate = b.end_at.slice(0, 10) > end ? end : b.end_at.slice(0, 10);
+    for (let d = fromDate; d <= toDate; d = addDays(d, 1)) {
+      push(Number(d.slice(8, 10)), { id: b.id, label: `🚗 ${b.owner_name}`, kind: "car" });
+    }
+  }
+
   // Monday-first grid
   const firstWeekday = (new Date(Date.UTC(year, mon - 1, 1)).getUTCDay() + 6) % 7;
   const days = [];

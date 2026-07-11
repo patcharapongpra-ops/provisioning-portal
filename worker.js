@@ -28,6 +28,12 @@ import {
   loadDashboard, loadCalendar, handleCreateEvent, handleDeleteEvent,
 } from "./plannerViews.js";
 import { adminHolidaysPage } from "./pages/adminHolidays.js";
+import { carBookingPage } from "./pages/carBooking.js";
+import { carLogPage } from "./pages/carLog.js";
+import {
+  loadCarPage, loadCarLog,
+  handleCreateBooking, handlePickupBooking, handleReturnBooking, handleCancelBooking,
+} from "./carBookings.js";
 import { hashPassword, verifyPassword, hashTempPassword, generateTempPassword } from "./auth.js";
 
 export default {
@@ -523,6 +529,57 @@ if (url.pathname === "/planner/events/delete") {
   if (!user) return redirect(request, "/login");
   if (request.method !== "POST") return redirect(request, "/planner/calendar");
   return await handleDeleteEvent(request, env, user);
+}
+
+if (url.pathname === "/car") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  const data = await loadCarPage(env, user);
+  return html(carBookingPage({
+    user, data,
+    error: url.searchParams.get("error"),
+    success: url.searchParams.get("success"),
+    conflict: {
+      who: url.searchParams.get("who"),
+      from: url.searchParams.get("from"),
+      to: url.searchParams.get("to"),
+    },
+  }));
+}
+
+if (url.pathname === "/car/book") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (request.method !== "POST") return redirect(request, "/car");
+  return await handleCreateBooking(request, env, user);
+}
+
+if (url.pathname === "/car/pickup") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (request.method !== "POST") return redirect(request, "/car");
+  return await handlePickupBooking(request, env, user);
+}
+
+if (url.pathname === "/car/return") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (request.method !== "POST") return redirect(request, "/car");
+  return await handleReturnBooking(request, env, user);
+}
+
+if (url.pathname === "/car/cancel") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (request.method !== "POST") return redirect(request, "/car");
+  return await handleCancelBooking(request, env, user);
+}
+
+if (url.pathname === "/car/log") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  const log = await loadCarLog(env, url.searchParams.get("ym"));
+  return html(carLogPage({ user, log }));
 }
 
 if (url.pathname === "/admin/holidays") {

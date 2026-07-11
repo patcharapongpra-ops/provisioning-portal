@@ -22,6 +22,7 @@ export function plannerCalendarPage({ user, cal, owners, filters, error, success
     crclose: ["var(--warn-soft)", "var(--warn)"],
     holiday: ["var(--danger-soft)", "var(--danger)"],
     personal: ["var(--violet-soft)", "var(--violet)"],
+    car: ["var(--teal-soft)", "var(--teal)"],
   };
 
   const weekdays = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
@@ -44,6 +45,9 @@ export function plannerCalendarPage({ user, cal, owners, filters, error, success
 
           if (ev.kind === "holiday" || ev.kind === "personal") {
             return `<span style="${pillStyle}" title="${label}">${label}</span>`;
+          }
+          if (ev.kind === "car") {
+            return `<a href="/car" style="${pillStyle}" title="${label}">${label}</a>`;
           }
           return `<a href="/planner/jobs/view?id=${ev.id}" style="${pillStyle}" title="${label}">${label}</a>`;
         })
@@ -102,6 +106,7 @@ export function plannerCalendarPage({ user, cal, owners, filters, error, success
             <span class="badge" style="background:var(--warn-soft);color:var(--warn)">ปิด CR</span>
             <span class="badge" style="background:var(--danger-soft);color:var(--danger)">วันหยุด</span>
             <span class="badge" style="background:var(--violet-soft);color:var(--violet)">อีเว้นท์ของฉัน</span>
+            <span class="badge" style="background:var(--teal-soft);color:var(--teal)">รถแผนก</span>
           </p>
         </div>
         <div class="action-row">

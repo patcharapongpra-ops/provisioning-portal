@@ -31,6 +31,8 @@ export function mainStyle() {
   --danger-soft: #f6ecec;
   --violet: #6a58a5;
   --violet-soft: #efebf7;
+  --teal: #1f6f6b;
+  --teal-soft: #e6f2f1;
 
   /* Terminal / config output (always dark, independent of theme) */
   --ink-surface: #0c0e13;
@@ -80,6 +82,8 @@ export function mainStyle() {
   --danger-soft: rgba(217, 134, 134, 0.12);
   --violet: #b4a5e3;
   --violet-soft: rgba(180, 165, 227, 0.14);
+  --teal: #7cc7c2;
+  --teal-soft: rgba(124, 199, 194, 0.13);
 
   --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --sh-md: 0 10px 28px -14px rgba(0, 0, 0, 0.5);
@@ -961,6 +965,22 @@ select:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Print (บันทึกการใช้รถรายเดือน ฯลฯ)                                  */
+/* ------------------------------------------------------------------ */
+.print-only { display: none; }
+
+@media print {
+  .sidebar, .no-print { display: none !important; }
+  .print-only { display: block; }
+  .app-shell { display: block; }
+  .container, .wide-container { max-width: 100%; padding: 0; margin: 0; }
+  body { background: #fff; }
+  .panel { border: 0; box-shadow: none; padding: 0; overflow: visible; }
+  th { background: #f0f0f0 !important; color: #000; }
+  th, td { border: 1px solid #999; padding: 5px 7px; }
 }
 
 /* ------------------------------------------------------------------ */

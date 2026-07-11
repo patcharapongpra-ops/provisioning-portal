@@ -28,9 +28,14 @@ export function homePage(user) {
       </a>
 
       <a class="card" href="/planner">
-  <h3>Planner</h3>
-  <p>วางแผนงาน ติดตามขั้นตอน และดูปฏิทินงานของคุณ</p>
-</a>
+        <h3>Planner</h3>
+        <p>วางแผนงาน ติดตามขั้นตอน และดูปฏิทินงานของคุณ</p>
+      </a>
+
+      <a class="card" href="/car">
+        <h3>จองรถแผนก</h3>
+        <p>จองรถ ดูคิว รับ-คืนรถ พร้อมบันทึกไมล์และชั้นจอด</p>
+      </a>
 
       <div class="card">
         <h3>SOP / คู่มือ</h3>
