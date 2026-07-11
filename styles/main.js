@@ -968,6 +968,75 @@ textarea:focus-visible {
 }
 
 /* ------------------------------------------------------------------ */
+/* Stacked tables — จอเล็กเปลี่ยนตารางเป็นการ์ด (ใช้ class stack-table) */
+/* ------------------------------------------------------------------ */
+.form-row-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+/* คู่ช่อง วันที่+เวลา ในฟอร์มจองรถ — ให้หดได้บนจอแคบ ไม่ล้นกรอบ */
+.admin-form .action-row input {
+  min-width: 0;
+}
+
+@media (max-width: 700px) {
+  .form-row-3 { grid-template-columns: 1fr; }
+
+  .stack-table thead { display: none; }
+
+  .stack-table,
+  .stack-table tbody,
+  .stack-table tr,
+  .stack-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .stack-table tr {
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-md);
+    padding: 10px 14px;
+    margin-bottom: 10px;
+  }
+
+  .stack-table td {
+    border-bottom: 0;
+    padding: 4px 0;
+    font-size: 14px;
+    white-space: normal;
+  }
+
+  .stack-table td[data-label]::before {
+    content: attr(data-label);
+    display: inline-block;
+    width: 86px;
+    color: var(--ink-3);
+    font-size: 12px;
+    font-weight: 600;
+    vertical-align: top;
+  }
+
+  .stack-table td:first-child {
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--ink);
+  }
+
+  .stack-table .row-actions-empty { display: none; }
+  .stack-table .action-row { flex-wrap: wrap; }
+  .stack-table .filter-input { width: 100% !important; }
+
+  /* ปุ่มใหญ่ขึ้นให้กดง่ายด้วยนิ้ว */
+  .stack-table .small-btn,
+  .stack-table .danger-btn {
+    padding: 10px 16px;
+    font-size: 13.5px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Print (บันทึกการใช้รถรายเดือน ฯลฯ)                                  */
 /* ------------------------------------------------------------------ */
 .print-only { display: none; }

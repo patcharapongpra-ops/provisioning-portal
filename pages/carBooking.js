@@ -44,7 +44,7 @@ export function carBookingPage({ user, data, error, success, conflict }) {
           </label>
           <label>&nbsp;</label>
         </div>
-        <div class="form-row" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+        <div class="form-row-3">
           <label>สภาพรถยนต์
             <select name="check_vehicle"><option value="1">ปกติ</option><option value="0">ผิดปกติ</option></select>
           </label>
@@ -78,10 +78,10 @@ export function carBookingPage({ user, data, error, success, conflict }) {
       let actions = "";
       if (b.status === "booked" && (mine || isAdmin)) {
         actions = `
-          <div class="action-row" style="flex-wrap:nowrap">
+          <div class="action-row">
             <form action="/car/pickup" method="POST" class="inline-form">
               <input type="hidden" name="booking_id" value="${b.id}">
-              <div class="action-row" style="flex-wrap:nowrap">
+              <div class="action-row">
                 <input name="odometer_out" type="number" min="0" required placeholder="ไมล์ออก${lastReturn?.odometer_in != null ? ` (ล่าสุด ${lastReturn.odometer_in})` : ""}" class="filter-input" style="width:150px;padding:6px 10px;font-size:13px">
                 <button class="small-btn" type="submit">รับรถ</button>
               </div>
@@ -95,12 +95,12 @@ export function carBookingPage({ user, data, error, success, conflict }) {
 
       return `
       <tr${mine ? ` style="background:var(--accent-soft)"` : ""}>
-        <td>${fmtDT(b.start_at)} → ${fmtDT(b.end_at)}</td>
-        <td>${escapeHtml(b.owner_name)}${mine ? ` <span class="muted">(คุณ)</span>` : ""}</td>
-        <td>${escapeHtml(b.purpose)}</td>
-        <td>${escapeHtml(b.location || "-")}</td>
-        <td>${statusBadge}</td>
-        <td>${actions}</td>
+        <td data-label="เวลา">${fmtDT(b.start_at)} → ${fmtDT(b.end_at)}</td>
+        <td data-label="ผู้จอง">${escapeHtml(b.owner_name)}${mine ? ` <span class="muted">(คุณ)</span>` : ""}</td>
+        <td data-label="เรื่อง">${escapeHtml(b.purpose)}</td>
+        <td data-label="สถานที่">${escapeHtml(b.location || "-")}</td>
+        <td data-label="สถานะ">${statusBadge}</td>
+        <td class="${actions ? "row-actions" : "row-actions row-actions-empty"}">${actions}</td>
       </tr>`;
     })
     .join("");
@@ -119,13 +119,13 @@ export function carBookingPage({ user, data, error, success, conflict }) {
 
       return `
       <tr>
-        <td>${fmtDT(b.start_at)}</td>
-        <td>${escapeHtml(b.owner_name)}</td>
-        <td>${escapeHtml(b.purpose)}${b.location ? `<span class="muted"> · ${escapeHtml(b.location)}</span>` : ""}</td>
-        <td>${b.odometer_out ?? "-"} → ${b.odometer_in ?? "-"}${km != null ? ` <span class="muted">(${km} กม.)</span>` : ""}</td>
-        <td>${escapeHtml(b.parking_floor || "-")}</td>
-        <td>${b.fuel_cost != null ? b.fuel_cost.toLocaleString() : "-"}</td>
-        <td>${condition}</td>
+        <td data-label="วันที่">${fmtDT(b.start_at)}</td>
+        <td data-label="ผู้ใช้">${escapeHtml(b.owner_name)}</td>
+        <td data-label="เรื่อง">${escapeHtml(b.purpose)}${b.location ? `<span class="muted"> · ${escapeHtml(b.location)}</span>` : ""}</td>
+        <td data-label="ไมล์">${b.odometer_out ?? "-"} → ${b.odometer_in ?? "-"}${km != null ? ` <span class="muted">(${km} กม.)</span>` : ""}</td>
+        <td data-label="จอดชั้น">${escapeHtml(b.parking_floor || "-")}</td>
+        <td data-label="น้ำมัน (฿)">${b.fuel_cost != null ? b.fuel_cost.toLocaleString() : "-"}</td>
+        <td data-label="สภาพ">${condition}</td>
       </tr>`;
     })
     .join("");
@@ -190,7 +190,7 @@ export function carBookingPage({ user, data, error, success, conflict }) {
 
     <section class="panel">
       <h2>คิวการจอง</h2>
-      <table>
+      <table class="stack-table">
         <thead>
           <tr>
             <th>ช่วงเวลา</th>
@@ -212,7 +212,7 @@ export function carBookingPage({ user, data, error, success, conflict }) {
         <h2>ประวัติการใช้ล่าสุด</h2>
         <a class="small-link-btn" href="/car/log">ดูบันทึกรายเดือน →</a>
       </div>
-      <table>
+      <table class="stack-table">
         <thead>
           <tr>
             <th>วันที่</th>
