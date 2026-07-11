@@ -1,4 +1,5 @@
 import { loginPage } from "./pages/login.js";
+import { registerPage } from "./pages/register.js";
 import { homePage } from "./pages/home.js";
 import { adminPage } from "./pages/admin.js";
 import { adminUsersPage } from "./pages/adminUsers.js";
@@ -31,7 +32,18 @@ export default {
     try {
       if (url.pathname === "/" || url.pathname === "/login") {
         const error = url.searchParams.get("error");
-        return html(loginPage(error));
+        const success = url.searchParams.get("success");
+        return html(loginPage(error, success));
+      }
+
+      if (url.pathname === "/register") {
+        const error = url.searchParams.get("error");
+        return html(registerPage(error));
+      }
+
+      if (url.pathname === "/api/register") {
+        if (request.method !== "POST") return redirect(request, "/register");
+        return await handleRegister(request, env);
       }
 
       if (url.pathname === "/api/login") {
@@ -462,18 +474,23 @@ async function handleLogin(request, env) {
 
   const user = await env.DB
     .prepare(
-      "SELECT id, username, full_name, role, password, is_active FROM users WHERE username = ? LIMIT 1"
+      "SELECT id, username, full_name, role, password, is_active FROM users WHERE username = ? COLLATE NOCASE LIMIT 1"
     )
     .bind(username)
     .first();
 
-  if (!user || user.is_active !== 1) {
+  if (!user) {
     return redirect(request, "/login?error=invalid");
   }
 
   const result = await verifyPassword(password, user.password);
   if (!result.ok) {
     return redirect(request, "/login?error=invalid");
+  }
+
+  // บอกสถานะ "รออนุมัติ" เฉพาะเมื่อรหัสถูกต้อง เพื่อไม่เปิดเผยสถานะบัญชีให้คนเดารหัส
+  if (user.is_active !== 1) {
+    return redirect(request, "/login?error=pending");
   }
 
   // lazy upgrade: ถ้ารหัสเดิมเป็น plaintext ให้ hash แล้วเขียนทับทันที
@@ -502,6 +519,54 @@ async function handleLogin(request, env) {
   );
 
   return response;
+}
+
+async function handleRegister(request, env) {
+  if (!env.DB) throw new Error("D1 binding DB not found.");
+
+  const formData = await request.formData();
+  const fullName = String(formData.get("full_name") || "").trim();
+  const username = String(formData.get("username") || "").trim().toLowerCase();
+  // trim ให้ตรงกับ handleLogin ไม่งั้นรหัสที่มี space หัว/ท้ายจะ login ไม่ได้
+  const password = String(formData.get("password") || "").trim();
+  const passwordConfirm = String(formData.get("password_confirm") || "").trim();
+
+  if (!fullName || !username || !password || !passwordConfirm) {
+    return redirect(request, "/register?error=missing");
+  }
+
+  if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+    return redirect(request, "/register?error=username");
+  }
+
+  if (password.length < 8) {
+    return redirect(request, "/register?error=password_short");
+  }
+
+  if (password !== passwordConfirm) {
+    return redirect(request, "/register?error=password_mismatch");
+  }
+
+  const existingUser = await env.DB
+    .prepare("SELECT id FROM users WHERE username = ? COLLATE NOCASE LIMIT 1")
+    .bind(username)
+    .first();
+
+  if (existingUser) {
+    return redirect(request, "/register?error=exists");
+  }
+
+  const passwordHash = await hashPassword(password);
+
+  // is_active = 0 → รอ admin กด Enable ในหน้า Manage Users ก่อนถึงจะ login ได้
+  await env.DB
+    .prepare(
+      "INSERT INTO users (username, password, full_name, role, is_active) VALUES (?, ?, ?, 'user', 0)"
+    )
+    .bind(username, passwordHash, fullName)
+    .run();
+
+  return redirect(request, "/login?success=registered");
 }
 
 async function handleLogout(request, env) {
@@ -540,7 +605,7 @@ async function handleCreateUser(request, env) {
   }
 
   const existingUser = await env.DB
-    .prepare("SELECT id FROM users WHERE username = ? LIMIT 1")
+    .prepare("SELECT id FROM users WHERE username = ? COLLATE NOCASE LIMIT 1")
     .bind(username)
     .first();
 
