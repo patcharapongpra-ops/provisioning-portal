@@ -504,6 +504,23 @@ async function handleLogin(request, env) {
   return response;
 }
 
+async function handleLogout(request, env) {
+  const sessionId = getCookie(request, "session_id");
+
+  if (sessionId) {
+    await env.DB.prepare("DELETE FROM sessions WHERE id = ?").bind(sessionId).run();
+  }
+
+  const response = redirect(request, "/login");
+
+  response.headers.append(
+    "Set-Cookie",
+    "session_id=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0"
+  );
+
+  return response;
+}
+
 async function handleCreateUser(request, env) {
   const formData = await request.formData();
 
