@@ -76,6 +76,7 @@ export function renderSidebar(user, active) {
         <span class="theme-switch"></span>
       </button>
 
+      <a href="/account/password" class="logout-link" data-native>เปลี่ยนรหัสผ่าน</a>
       <a href="/logout" class="logout-link" data-native>Logout</a>
     </div>
   </aside>

@@ -27,6 +27,7 @@ export function loginPage(error, success) {
 
     <p style="margin:18px 0 0;font-size:13.5px">
       ยังไม่มีบัญชี? <a href="/register" style="color:var(--accent);font-weight:600">สมัครสมาชิก</a>
+      &nbsp;·&nbsp; <a href="/forgot" style="color:var(--ink-3)">ลืมรหัสผ่าน?</a>
     </p>
   </div>
 </body>

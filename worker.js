@@ -1,5 +1,7 @@
 import { loginPage } from "./pages/login.js";
 import { registerPage } from "./pages/register.js";
+import { forgotPage } from "./pages/forgot.js";
+import { accountPasswordPage } from "./pages/accountPassword.js";
 import { homePage } from "./pages/home.js";
 import { adminPage } from "./pages/admin.js";
 import { adminUsersPage } from "./pages/adminUsers.js";
@@ -23,7 +25,7 @@ import {
 import { plannerDashboardPage } from "./pages/plannerDashboard.js";
 import { plannerCalendarPage } from "./pages/plannerCalendar.js";
 import { loadDashboard, loadCalendar } from "./plannerViews.js";
-import { hashPassword, verifyPassword } from "./auth.js";
+import { hashPassword, verifyPassword, hashTempPassword, generateTempPassword } from "./auth.js";
 
 export default {
   async fetch(request, env, ctx) {
@@ -39,6 +41,53 @@ export default {
       if (url.pathname === "/register") {
         const error = url.searchParams.get("error");
         return html(registerPage(error));
+      }
+
+      if (url.pathname === "/forgot") {
+        return html(forgotPage());
+      }
+
+      // ถ้ากำลังใช้รหัสชั่วคราวจาก admin → บังคับไปตั้งรหัสใหม่ก่อนใช้งานหน้าอื่น
+      const passwordGateExempt = new Set([
+        "/account/password",
+        "/account/password/update",
+        "/logout",
+        "/api/login",
+        "/api/register",
+      ]);
+      if (!passwordGateExempt.has(url.pathname)) {
+        const gateUser = await requireLogin(request, env);
+        if (gateUser && gateUser.must_change_password) {
+          return redirect(request, "/account/password?required=1");
+        }
+      }
+
+      if (url.pathname === "/account/password") {
+        const user = await requireLogin(request, env);
+        if (!user) return redirect(request, "/login");
+        return html(
+          accountPasswordPage({
+            user,
+            error: url.searchParams.get("error"),
+            success: url.searchParams.get("success"),
+            required: url.searchParams.get("required"),
+          })
+        );
+      }
+
+      if (url.pathname === "/account/password/update") {
+        const user = await requireLogin(request, env);
+        if (!user) return redirect(request, "/login");
+        if (request.method !== "POST") return redirect(request, "/account/password");
+        return await handleChangePassword(request, env, user);
+      }
+
+      if (url.pathname === "/admin/users/reset-password") {
+        const user = await requireLogin(request, env);
+        if (!user) return redirect(request, "/login");
+        if (user.role !== "admin") return redirect(request, "/home");
+        if (request.method !== "POST") return redirect(request, "/admin/users");
+        return await handleAdminResetPassword(request, env, user);
       }
 
       if (url.pathname === "/api/register") {
@@ -567,6 +616,96 @@ async function handleRegister(request, env) {
     .run();
 
   return redirect(request, "/login?success=registered");
+}
+
+async function handleChangePassword(request, env, user) {
+  const formData = await request.formData();
+  const currentPassword = String(formData.get("current_password") || "").trim();
+  const newPassword = String(formData.get("new_password") || "").trim();
+  const newPasswordConfirm = String(formData.get("new_password_confirm") || "").trim();
+
+  if (!currentPassword || !newPassword || !newPasswordConfirm) {
+    return redirect(request, "/account/password?error=missing");
+  }
+
+  if (newPassword.length < 8) {
+    return redirect(request, "/account/password?error=password_short");
+  }
+
+  if (newPassword !== newPasswordConfirm) {
+    return redirect(request, "/account/password?error=password_mismatch");
+  }
+
+  const row = await env.DB
+    .prepare("SELECT password FROM users WHERE id = ? LIMIT 1")
+    .bind(user.id)
+    .first();
+
+  const result = await verifyPassword(currentPassword, row ? row.password : "");
+  if (!result.ok) {
+    return redirect(request, "/account/password?error=current");
+  }
+
+  const newHash = await hashPassword(newPassword);
+  await env.DB
+    .prepare("UPDATE users SET password = ? WHERE id = ?")
+    .bind(newHash, user.id)
+    .run();
+
+  // ตัด session อื่นทั้งหมดของบัญชีนี้ เหลือเครื่องที่กำลังเปลี่ยนรหัสอยู่
+  const sessionId = getCookie(request, "session_id");
+  await env.DB
+    .prepare("DELETE FROM sessions WHERE user_id = ? AND id != ?")
+    .bind(user.id, sessionId)
+    .run();
+
+  return redirect(request, "/account/password?success=1");
+}
+
+async function handleAdminResetPassword(request, env, adminUser) {
+  const formData = await request.formData();
+  const userId = Number(String(formData.get("user_id") || "").trim());
+
+  if (!userId) {
+    return redirect(request, "/admin/users?error=reset");
+  }
+
+  const target = await env.DB
+    .prepare("SELECT id, username FROM users WHERE id = ? LIMIT 1")
+    .bind(userId)
+    .first();
+
+  if (!target) {
+    return redirect(request, "/admin/users?error=reset");
+  }
+
+  const tempPassword = generateTempPassword();
+  const tempHash = await hashTempPassword(tempPassword);
+
+  await env.DB
+    .prepare("UPDATE users SET password = ? WHERE id = ?")
+    .bind(tempHash, userId)
+    .run();
+
+  // ตัดทุก session ของผู้ใช้นั้น — รหัสเดิม/เครื่องเดิมใช้ไม่ได้อีก
+  await env.DB
+    .prepare("DELETE FROM sessions WHERE user_id = ?")
+    .bind(userId)
+    .run();
+
+  // render หน้าโดยตรง (ไม่ redirect) เพื่อโชว์รหัสชั่วคราวครั้งเดียว ไม่ให้ค้างใน URL/history
+  const users = await env.DB
+    .prepare(
+      "SELECT id, username, full_name, role, is_active, created_at FROM users ORDER BY id ASC"
+    )
+    .all();
+
+  return html(
+    adminUsersPage(adminUser, users.results || [], null, null, {
+      username: target.username,
+      tempPassword,
+    })
+  );
 }
 
 async function handleLogout(request, env) {
@@ -1255,11 +1394,12 @@ async function requireLogin(request, env) {
   const user = await env.DB
     .prepare(
       `
-      SELECT 
+      SELECT
         users.id,
         users.username,
         users.full_name,
-        users.role
+        users.role,
+        users.password
       FROM sessions
       JOIN users ON users.id = sessions.user_id
       WHERE sessions.id = ?
@@ -1271,7 +1411,17 @@ async function requireLogin(request, env) {
     .bind(sessionId)
     .first();
 
-  return user || null;
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    username: user.username,
+    full_name: user.full_name,
+    role: user.role,
+    // temp$ นำหน้า hash = รหัสชั่วคราวจาก admin ต้องเปลี่ยนก่อนใช้งาน
+    must_change_password:
+      typeof user.password === "string" && user.password.startsWith("temp$"),
+  };
 }
 
 function getCookie(request, name) {

@@ -45,6 +45,21 @@ export function isHashed(stored) {
   return typeof stored === "string" && stored.startsWith("pbkdf2$");
 }
 
+// รหัสชั่วคราวที่ admin ออกให้: hash ปกติแต่นำหน้าด้วย temp$
+// login ได้ตามปกติ แต่ระบบจะบังคับให้ตั้งรหัสใหม่ก่อนใช้งานหน้าอื่น
+export async function hashTempPassword(password) {
+  return "temp$" + (await hashPassword(password));
+}
+
+// สุ่มรหัสชั่วคราวแบบอ่านง่าย (ตัดตัวที่ชวนสับสน 0/O, 1/l/I ออก)
+export function generateTempPassword(length = 12) {
+  const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  let out = "";
+  for (let i = 0; i < length; i++) out += chars[bytes[i] % chars.length];
+  return out;
+}
+
 function timingSafeEqual(a, b) {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -52,8 +67,14 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
-// คืน { ok, legacy } — legacy = true แปลว่ารหัสใน DB ยังเป็น plaintext (ควร upgrade)
+// คืน { ok, legacy, temp } — legacy = รหัสใน DB ยังเป็น plaintext (ควร upgrade)
+// temp = รหัสชั่วคราวจาก admin (ต้องบังคับเปลี่ยนหลัง login)
 export async function verifyPassword(password, stored) {
+  if (typeof stored === "string" && stored.startsWith("temp$")) {
+    const inner = await verifyPassword(password, stored.slice(5));
+    return { ok: inner.ok, legacy: false, temp: true };
+  }
+
   if (!isHashed(stored)) {
     return { ok: password === stored, legacy: true };
   }

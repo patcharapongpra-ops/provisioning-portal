@@ -1,7 +1,7 @@
 import { mainStyle } from "../styles/main.js";
 import { renderSidebar, themeInitScript } from "../layout.js";
 
-export function adminUsersPage(user, users, error, success) {
+export function adminUsersPage(user, users, error, success, resetInfo) {
   const rows = users
     .map((item) => {
       const nextStatus = item.is_active ? 0 : 1;
@@ -17,16 +17,31 @@ export function adminUsersPage(user, users, error, success) {
         <td>${statusText}</td>
         <td>${escapeHtml(item.created_at || "")}</td>
         <td>
-          <form action="/admin/users/toggle" method="POST" class="inline-form">
-            <input type="hidden" name="user_id" value="${item.id}">
-            <input type="hidden" name="next_status" value="${nextStatus}">
-            <button class="small-btn" type="submit">${buttonText}</button>
-          </form>
+          <div class="action-row">
+            <form action="/admin/users/toggle" method="POST" class="inline-form">
+              <input type="hidden" name="user_id" value="${item.id}">
+              <input type="hidden" name="next_status" value="${nextStatus}">
+              <button class="small-btn" type="submit">${buttonText}</button>
+            </form>
+
+            <form action="/admin/users/reset-password" method="POST" class="inline-form" onsubmit="return confirm('ออกรหัสชั่วคราวให้ ${escapeHtml(item.username)}? รหัสเดิมจะใช้ไม่ได้ และผู้ใช้นี้จะถูกตัดออกจากระบบทันที')">
+              <input type="hidden" name="user_id" value="${item.id}">
+              <button class="small-btn" type="submit">Reset รหัส</button>
+            </form>
+          </div>
         </td>
       </tr>
     `;
     })
     .join("");
+
+  const resetNotice = resetInfo
+    ? `<div class="alert success">
+         รหัสชั่วคราวของ <strong>${escapeHtml(resetInfo.username)}</strong>:
+         <code style="font-family:var(--font-mono);font-size:15px;background:var(--surface-2);border:1px solid var(--hairline-strong);padding:3px 10px;border-radius:6px;user-select:all">${escapeHtml(resetInfo.tempPassword)}</code>
+         — แสดงครั้งเดียว จดแล้วส่งให้ผู้ใช้ทางช่องทางส่วนตัว เมื่อผู้ใช้ login ระบบจะบังคับตั้งรหัสใหม่
+       </div>`
+    : "";
 
   return `
 <!DOCTYPE html>
@@ -47,6 +62,7 @@ export function adminUsersPage(user, users, error, success) {
       <p>จัดการผู้ใช้งานในระบบ</p>
     </section>
 
+    ${resetNotice}
     ${showMessage(error, success)}
 
     <section class="panel">
@@ -135,6 +151,10 @@ function showMessage(error, success) {
 
   if (error === "toggle") {
     return `<div class="alert error">ไม่สามารถเปลี่ยนสถานะ user ได้</div>`;
+  }
+
+  if (error === "reset") {
+    return `<div class="alert error">ไม่สามารถรีเซ็ตรหัสผ่านได้ ไม่พบผู้ใช้ที่ต้องการ</div>`;
   }
 
   return "";
