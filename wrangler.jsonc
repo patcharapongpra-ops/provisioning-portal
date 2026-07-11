@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "provisioning-portal",
+  "main": "worker.js",
+  "compatibility_date": "2026-07-11",
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "provisioning_portal_db",
+      "database_id": "5f0fa9bc-0749-4bcf-95ac-45c3aa80dc16"
+    }
+  ]
+}
