@@ -24,7 +24,10 @@ import {
 } from "./plannerJobs.js";
 import { plannerDashboardPage } from "./pages/plannerDashboard.js";
 import { plannerCalendarPage } from "./pages/plannerCalendar.js";
-import { loadDashboard, loadCalendar } from "./plannerViews.js";
+import {
+  loadDashboard, loadCalendar, handleCreateEvent, handleDeleteEvent,
+} from "./plannerViews.js";
+import { adminHolidaysPage } from "./pages/adminHolidays.js";
 import { hashPassword, verifyPassword, hashTempPassword, generateTempPassword } from "./auth.js";
 
 export default {
@@ -503,7 +506,56 @@ if (url.pathname === "/planner/calendar") {
     user, cal,
     owners: senior ? await loadOwners(env) : [],
     filters,
+    error: url.searchParams.get("error"),
+    success: url.searchParams.get("success"),
   }));
+}
+
+if (url.pathname === "/planner/events/create") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (request.method !== "POST") return redirect(request, "/planner/calendar");
+  return await handleCreateEvent(request, env, user);
+}
+
+if (url.pathname === "/planner/events/delete") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (request.method !== "POST") return redirect(request, "/planner/calendar");
+  return await handleDeleteEvent(request, env, user);
+}
+
+if (url.pathname === "/admin/holidays") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (user.role !== "admin") return redirect(request, "/home");
+
+  const holidays = await env.DB
+    .prepare("SELECT id, holiday_date, name FROM office_holidays ORDER BY holiday_date ASC, id ASC")
+    .all();
+
+  return html(adminHolidaysPage({
+    user,
+    holidays: holidays.results || [],
+    error: url.searchParams.get("error"),
+    success: url.searchParams.get("success"),
+  }));
+}
+
+if (url.pathname === "/admin/holidays/create") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (user.role !== "admin") return redirect(request, "/home");
+  if (request.method !== "POST") return redirect(request, "/admin/holidays");
+  return await handleCreateHoliday(request, env);
+}
+
+if (url.pathname === "/admin/holidays/delete") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (user.role !== "admin") return redirect(request, "/home");
+  if (request.method !== "POST") return redirect(request, "/admin/holidays");
+  return await handleDeleteHoliday(request, env);
 }
 
       return new Response("Not Found", { status: 404 });
@@ -1051,6 +1103,48 @@ async function handleToggleTemplate(request, env) {
     .run();
 
   return redirect(request, "/admin/templates?success=updated");
+}
+
+async function handleCreateHoliday(request, env) {
+  const formData = await request.formData();
+  const holidayDate = String(formData.get("holiday_date") || "").trim();
+  const name = String(formData.get("name") || "").trim().slice(0, 120);
+
+  if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(holidayDate)) {
+    return redirect(request, "/admin/holidays?error=missing");
+  }
+
+  const existing = await env.DB
+    .prepare("SELECT id FROM office_holidays WHERE holiday_date = ? AND name = ? LIMIT 1")
+    .bind(holidayDate, name)
+    .first();
+
+  if (existing) {
+    return redirect(request, "/admin/holidays?error=exists");
+  }
+
+  await env.DB
+    .prepare("INSERT INTO office_holidays (holiday_date, name) VALUES (?, ?)")
+    .bind(holidayDate, name)
+    .run();
+
+  return redirect(request, "/admin/holidays?success=created");
+}
+
+async function handleDeleteHoliday(request, env) {
+  const formData = await request.formData();
+  const holidayId = Number(String(formData.get("holiday_id") || "").trim());
+
+  if (!holidayId) {
+    return redirect(request, "/admin/holidays?error=missing");
+  }
+
+  await env.DB
+    .prepare("DELETE FROM office_holidays WHERE id = ?")
+    .bind(holidayId)
+    .run();
+
+  return redirect(request, "/admin/holidays?success=deleted");
 }
 
 async function getOrCreateDeviceType(env, deviceTypeName) {

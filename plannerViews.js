@@ -1,5 +1,14 @@
 // plannerViews.js
 // loaders สำหรับ Dashboard และ Calendar (คำนวณใน JS จากงานใน scope)
+// + อีเว้นท์ส่วนตัว (calendar_events) และวันหยุดออฟฟิศ (office_holidays)
+
+function redirect(request, path) {
+  const url = new URL(request.url);
+  url.pathname = path.split("?")[0];
+  const query = path.includes("?") ? path.split("?")[1] : "";
+  url.search = query ? "?" + query : "";
+  return new Response(null, { status: 302, headers: { Location: url.toString() } });
+}
 
 function isSenior(user) {
   return user.role === "staff" || user.role === "admin";
@@ -140,11 +149,33 @@ export async function loadCalendar(env, user, ownerId, ym) {
 
   const jobs = await fetchScopedJobs(env, user, ownerId, extraCond, extraBinds);
 
+  // วันหยุดออฟฟิศ (ของกลาง ทุกคนเห็น)
+  const holidayResult = await env.DB
+    .prepare(
+      "SELECT id, holiday_date, name FROM office_holidays WHERE holiday_date BETWEEN ? AND ? ORDER BY holiday_date ASC, id ASC"
+    )
+    .bind(start, end)
+    .all();
+  const holidays = holidayResult.results || [];
+
+  // อีเว้นท์ส่วนตัว — เห็นเฉพาะของตัวเองเสมอ ไม่ขึ้นกับ filter รายคนของ senior
+  const myEventResult = await env.DB
+    .prepare(
+      "SELECT id, title, event_date, note FROM calendar_events WHERE owner_id = ? AND event_date BETWEEN ? AND ? ORDER BY event_date ASC, id ASC"
+    )
+    .bind(user.id, start, end)
+    .all();
+  const myEvents = myEventResult.results || [];
+
   const eventsByDay = {};
   const push = (day, ev) => {
     if (!eventsByDay[day]) eventsByDay[day] = [];
     eventsByDay[day].push(ev);
   };
+
+  for (const h of holidays) {
+    push(Number(h.holiday_date.slice(8, 10)), { id: h.id, label: h.name, kind: "holiday" });
+  }
 
   const dateFields = [
     ["install_date", "install"],
@@ -156,9 +187,13 @@ export async function loadCalendar(env, user, ownerId, ym) {
     for (const [field, kind] of dateFields) {
       const d = job[field];
       if (d && d >= start && d <= end) {
-        push(Number(d.slice(8, 10)), { id: job.id, cid: job.cid, kind });
+        push(Number(d.slice(8, 10)), { id: job.id, label: job.cid, kind });
       }
     }
+  }
+
+  for (const ev of myEvents) {
+    push(Number(ev.event_date.slice(8, 10)), { id: ev.id, label: ev.title, kind: "personal" });
   }
 
   // Monday-first grid
@@ -180,5 +215,54 @@ export async function loadCalendar(env, user, ownerId, ym) {
     month: "long",
   });
 
-  return { month, monthLabel, days, prevYm, nextYm, today: todayTH() };
+  return { month, monthLabel, days, prevYm, nextYm, today: todayTH(), myEvents, holidays };
+}
+
+// ---------- Personal calendar events ----------
+export async function handleCreateEvent(request, env, user) {
+  const formData = await request.formData();
+  const title = String(formData.get("title") || "").trim().slice(0, 120);
+  const eventDate = String(formData.get("event_date") || "").trim();
+  const note = String(formData.get("note") || "").trim().slice(0, 500);
+
+  if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) {
+    return redirect(request, "/planner/calendar?error=event");
+  }
+
+  await env.DB
+    .prepare(
+      "INSERT INTO calendar_events (owner_id, title, event_date, note) VALUES (?, ?, ?, ?)"
+    )
+    .bind(user.id, title, eventDate, note)
+    .run();
+
+  return redirect(
+    request,
+    `/planner/calendar?ym=${eventDate.slice(0, 7)}&success=event_created`
+  );
+}
+
+export async function handleDeleteEvent(request, env, user) {
+  const formData = await request.formData();
+  const eventId = Number(String(formData.get("event_id") || "").trim());
+
+  if (!eventId) return redirect(request, "/planner/calendar");
+
+  // ลบได้เฉพาะของตัวเอง
+  const ev = await env.DB
+    .prepare("SELECT id, event_date FROM calendar_events WHERE id = ? AND owner_id = ? LIMIT 1")
+    .bind(eventId, user.id)
+    .first();
+
+  if (!ev) return redirect(request, "/planner/calendar");
+
+  await env.DB
+    .prepare("DELETE FROM calendar_events WHERE id = ? AND owner_id = ?")
+    .bind(eventId, user.id)
+    .run();
+
+  return redirect(
+    request,
+    `/planner/calendar?ym=${String(ev.event_date).slice(0, 7)}&success=event_deleted`
+  );
 }

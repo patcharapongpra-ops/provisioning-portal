@@ -32,6 +32,11 @@ export function adminPage(user) {
         <p>สร้าง Template และกำหนด Field สำหรับ Generate Config</p>
       </a>
 
+      <a class="card" href="/admin/holidays">
+        <h3>วันหยุดออฟฟิศ</h3>
+        <p>เพิ่ม/ลบวันหยุด แสดงในปฏิทินของทุกคน</p>
+      </a>
+
       <a class="card" href="/config">
         <h3>Config Generator</h3>
         <p>ทดสอบ Generate Config จาก Template</p>

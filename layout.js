@@ -29,6 +29,7 @@ const ADMIN_GROUP = {
     { key: "admin-overview", href: "/admin", label: "Overview" },
     { key: "admin-users", href: "/admin/users", label: "Manage Users" },
     { key: "admin-templates", href: "/admin/templates", label: "Manage Templates" },
+    { key: "admin-holidays", href: "/admin/holidays", label: "วันหยุดออฟฟิศ" },
   ],
 };
 

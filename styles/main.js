@@ -29,6 +29,8 @@ export function mainStyle() {
   --warn-soft: #f7efe0;
   --danger: #9c3b3b;
   --danger-soft: #f6ecec;
+  --violet: #6a58a5;
+  --violet-soft: #efebf7;
 
   /* Terminal / config output (always dark, independent of theme) */
   --ink-surface: #0c0e13;
@@ -76,6 +78,8 @@ export function mainStyle() {
   --warn-soft: rgba(217, 171, 92, 0.12);
   --danger: #d98686;
   --danger-soft: rgba(217, 134, 134, 0.12);
+  --violet: #b4a5e3;
+  --violet-soft: rgba(180, 165, 227, 0.14);
 
   --sh-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
   --sh-md: 0 10px 28px -14px rgba(0, 0, 0, 0.5);
