@@ -37,6 +37,11 @@ export function homePage(user) {
         <p>จองรถ ดูคิว รับ-คืนรถ พร้อมบันทึกไมล์และชั้นจอด</p>
       </a>
 
+      <a class="card" href="/diagrams">
+        <h3>Network Diagram</h3>
+        <p>วาด diagram วงจรลูกค้า บันทึก/แก้ต่อได้ ดาวน์โหลด PNG</p>
+      </a>
+
       <div class="card">
         <h3>SOP / คู่มือ</h3>
         <p>รวมขั้นตอนการทำงานและคู่มือภายใน</p>

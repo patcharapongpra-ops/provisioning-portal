@@ -21,6 +21,7 @@ const NAV_GROUPS = [
     label: "เครื่องมือ",
     items: [
       { key: "config", href: "/config", label: "Config Generator" },
+      { key: "diagrams", href: "/diagrams", label: "Diagram" },
       { key: "car", href: "/car", label: "จองรถ" },
     ],
   },

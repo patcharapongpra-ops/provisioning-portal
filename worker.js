@@ -34,6 +34,12 @@ import {
   loadCarPage, loadCarLog,
   handleCreateBooking, handlePickupBooking, handleReturnBooking, handleCancelBooking,
 } from "./carBookings.js";
+import { diagramListPage } from "./pages/diagramList.js";
+import { diagramEditorPage } from "./pages/diagramEditor.js";
+import {
+  loadDiagramList, loadDiagram, canEditDiagram,
+  handleSaveDiagram, handleDeleteDiagram, handleCloneDiagram,
+} from "./diagrams.js";
 import { hashPassword, verifyPassword, hashTempPassword, generateTempPassword } from "./auth.js";
 
 export default {
@@ -596,6 +602,57 @@ if (url.pathname === "/car/log") {
   if (!user) return redirect(request, "/login");
   const log = await loadCarLog(env, url.searchParams.get("ym"));
   return html(carLogPage({ user, log }));
+}
+
+if (url.pathname === "/diagrams") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  const diagrams = await loadDiagramList(env);
+  return html(diagramListPage({
+    user, diagrams,
+    error: url.searchParams.get("error"),
+    success: url.searchParams.get("success"),
+  }));
+}
+
+if (url.pathname === "/diagrams/new") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  return html(diagramEditorPage({ user, diagram: null, canEdit: true, error: null, success: null }));
+}
+
+if (url.pathname === "/diagrams/edit") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  const diagram = await loadDiagram(env, url.searchParams.get("id"));
+  if (!diagram) return redirect(request, "/diagrams?error=notfound");
+  return html(diagramEditorPage({
+    user, diagram,
+    canEdit: canEditDiagram(user, diagram),
+    error: url.searchParams.get("error"),
+    success: url.searchParams.get("success"),
+  }));
+}
+
+if (url.pathname === "/diagrams/save") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (request.method !== "POST") return redirect(request, "/diagrams");
+  return await handleSaveDiagram(request, env, user);
+}
+
+if (url.pathname === "/diagrams/delete") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (request.method !== "POST") return redirect(request, "/diagrams");
+  return await handleDeleteDiagram(request, env, user);
+}
+
+if (url.pathname === "/diagrams/clone") {
+  const user = await requireLogin(request, env);
+  if (!user) return redirect(request, "/login");
+  if (request.method !== "POST") return redirect(request, "/diagrams");
+  return await handleCloneDiagram(request, env, user);
 }
 
 if (url.pathname === "/admin/holidays") {
