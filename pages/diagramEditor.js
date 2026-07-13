@@ -127,7 +127,7 @@ export function diagramEditorPage({ user, diagram, canEdit, error, success }) {
 
       <div>
         <div class="dg-canvas-card">
-          <div class="mode-banner" id="mode-banner">🔗 ลากไปวางบนอุปกรณ์ปลายทาง แล้วปล่อย</div>
+          <div class="mode-banner" id="mode-banner">🔗 ลากไปใกล้อุปกรณ์ปลายทางแล้วปล่อย ไม่ต้องวางตรงเป๊ะ</div>
           <svg id="dia" viewBox="0 0 1280 660" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Noto Sans Thai, sans-serif"></svg>
         </div>
         <div id="inspector"></div>
@@ -561,9 +561,10 @@ function deviceExtras(d){
   } else {
     var r = TYPE_META[d.type].r + 8;
     s += '<circle r="' + r + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-dasharray="6,5"/>';
-    s += '<g data-connect="1" transform="translate(' + (r + 18) + ',0)" style="cursor:crosshair">'
-      + '<circle r="13" fill="#1f6f6b"/>'
-      + '<path d="M-6,0 H6 M0,-6 V6" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></g>';
+    s += '<g data-connect="1" transform="translate(' + (r + 26) + ',0)" style="cursor:crosshair">'
+      + '<circle r="34" fill="transparent"/>'
+      + '<circle r="18" fill="#1f6f6b"/>'
+      + '<path d="M-8,0 H8 M0,-8 V8" stroke="#fff" stroke-width="3" stroke-linecap="round"/></g>';
   }
   return s;
 }
@@ -728,15 +729,23 @@ function render(){
   geoms.forEach(function(pair){ s += linkStrokeSvg(pair[0], pair[1]); });
   state.devices.filter(function(d){ return d.type === "cloud" || d.type === "mediacloud"; }).forEach(function(d){ s += deviceSvg(d); });
   state.devices.filter(function(d){ return d.type !== "box" && d.type !== "cloud" && d.type !== "mediacloud"; }).forEach(function(d){ s += deviceSvg(d); });
+  s += '<g pointer-events="none">';
   geoms.forEach(function(pair){ s += linkLabelsSvg(pair[0], pair[1]); });
 
   if (connecting && connecting.x != null){
     var from = findDev(connecting.fromId);
+    var tgt = connecting.targetId != null ? findDev(connecting.targetId) : null;
     if (from){
-      s += '<line x1="' + from.x + '" y1="' + from.y + '" x2="' + connecting.x + '" y2="' + connecting.y
+      var ex = tgt ? tgt.x : connecting.x, ey = tgt ? tgt.y : connecting.y;
+      if (tgt){
+        s += '<circle cx="' + tgt.x + '" cy="' + tgt.y + '" r="' + (TYPE_META[tgt.type].r + 12)
+          + '" fill="none" stroke="#1f6f6b" stroke-width="5" opacity="0.85"/>';
+      }
+      s += '<line x1="' + from.x + '" y1="' + from.y + '" x2="' + ex + '" y2="' + ey
         + '" stroke="#1f6f6b" stroke-width="4" stroke-dasharray="8,6" opacity="0.8"/>';
     }
   }
+  s += '</g>';
   document.getElementById("dia").innerHTML = s;
 }
 
@@ -750,6 +759,15 @@ function toSvgXY(evt){
 }
 function banner(show){
   document.getElementById("mode-banner").style.display = show ? "block" : "none";
+}
+function snapTarget(x, y, fromId){
+  var best = null, bestDist = Infinity;
+  state.devices.forEach(function(d){
+    if (d.id === fromId || d.type === "box") return;
+    var dist = Math.sqrt((d.x - x) * (d.x - x) + (d.y - y) * (d.y - y)) - TYPE_META[d.type].r;
+    if (dist < bestDist){ bestDist = dist; best = d; }
+  });
+  return bestDist <= 80 ? best : null;
 }
 
 svgEl.addEventListener("pointerdown", function(e){
@@ -769,7 +787,7 @@ svgEl.addEventListener("pointerdown", function(e){
 
   if (e.target.closest("[data-connect]")){
     var g2 = e.target.closest("g[data-id]");
-    connecting = { fromId: Number(g2.getAttribute("data-id")), x: p.x, y: p.y };
+    connecting = { fromId: Number(g2.getAttribute("data-id")), x: p.x, y: p.y, targetId: null };
     banner(true);
     svgEl.setPointerCapture(e.pointerId);
     e.preventDefault();
@@ -790,7 +808,7 @@ svgEl.addEventListener("pointerdown", function(e){
   var id = Number(gg.getAttribute("data-id"));
   var d2 = findDev(id);
   if (!d2) return;
-  pointer = { devId: id, dx: p.x - d2.x, dy: p.y - d2.y, moved: false, pushed: false };
+  pointer = { devId: id, dx: p.x - d2.x, dy: p.y - d2.y, sx: e.clientX, sy: e.clientY, moved: false, pushed: false };
   svgEl.setPointerCapture(e.pointerId);
   e.preventDefault();
 });
@@ -811,6 +829,8 @@ svgEl.addEventListener("pointermove", function(e){
 
   if (connecting){
     connecting.x = p.x; connecting.y = p.y;
+    var t = snapTarget(p.x, p.y, connecting.fromId);
+    connecting.targetId = t ? t.id : null;
     render();
     return;
   }
@@ -820,7 +840,7 @@ svgEl.addEventListener("pointermove", function(e){
   if (!d2) return;
   var nx = Math.round(Math.max(20, Math.min(1260, p.x - pointer.dx)));
   var ny = Math.round(Math.max(90, Math.min(640, p.y - pointer.dy)));
-  if (Math.abs(nx - d2.x) > 4 || Math.abs(ny - d2.y) > 4){
+  if (Math.abs(e.clientX - pointer.sx) > 6 || Math.abs(e.clientY - pointer.sy) > 6){
     if (!pointer.pushed){ pushUndo(); pointer.pushed = true; }
     pointer.moved = true;
   }
@@ -831,15 +851,14 @@ svgEl.addEventListener("pointerup", function(e){
   if (resizing){ resizing = null; return; }
 
   if (connecting){
-    var el = document.elementFromPoint(e.clientX, e.clientY);
-    var g = el && el.closest ? el.closest("g[data-id]") : null;
-    var targetId = g ? Number(g.getAttribute("data-id")) : null;
+    var p2 = toSvgXY(e);
     var from = findDev(connecting.fromId);
-    var target = targetId != null ? findDev(targetId) : null;
+    var target = snapTarget(p2.x, p2.y, connecting.fromId);
     var fromId = connecting.fromId;
     connecting = null;
+    pointer = null;
     banner(false);
-    if (from && target && target.id !== fromId && target.type !== "box"){
+    if (from && target){
       pushUndo();
       var isCloud = from.type.indexOf("cloud") >= 0 || target.type.indexOf("cloud") >= 0;
       var l = addLink({ from: fromId, to: target.id, style: isCloud ? "blue" : "red" });
@@ -855,6 +874,11 @@ svgEl.addEventListener("pointerup", function(e){
   if (moved) return;
   select("device", id);
   render();
+});
+
+svgEl.addEventListener("pointercancel", function(){
+  pointer = null; resizing = null;
+  if (connecting){ connecting = null; banner(false); render(); }
 });
 
 document.addEventListener("keydown", function(e){
