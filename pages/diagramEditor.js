@@ -626,18 +626,18 @@ function polyAt(pts, t){
   return pts[pts.length - 1];
 }
 
-// เส้นหลบแบบหักเหลี่ยม 45°: ตรง → เฉียงออก → ขนานแนวเดิม → เฉียงกลับ → ตรง
-// (แทนเส้นโค้ง bezier เดิม) ถ้าเส้นสั้นเกินจะหักยอดเดียวตรงกลางแทน
+// เส้นหักเหลี่ยม 45°: ปลายสองข้างรวมเข้าที่ตัวอุปกรณ์เสมอ — โผล่จากอุปกรณ์
+// เป็นท่อนตรงสั้นๆ แล้วเฉียง 45° ออกไปวิ่งขนานแนวเดิม ก่อนเฉียงกลับเข้าปลายทาง
+// ถ้าเส้นสั้นเกินจะหักยอดเดียวตรงกลางแทน
 function bendPts(p0, p1, px, py, off){
   if (!off) return [p0, p1];
   var dx = p1.x - p0.x, dy = p1.y - p0.y;
   var len = Math.sqrt(dx * dx + dy * dy) || 1;
   var ux = dx / len, uy = dy / len;
   var a = Math.abs(off);
-  var h = Math.max(46, a * 0.8);
-  var s1 = len / 2 - h - a, s2 = len / 2 + h + a;
+  var s1 = 26, s2 = len - 26;
   function P(s, o){ return { x: p0.x + ux * s + px * o, y: p0.y + uy * s + py * o }; }
-  if (s1 < 12) return [p0, P(len / 2, off), p1];
+  if (s2 - s1 < 2 * a + 16) return [p0, P(len / 2, off), p1];
   return [p0, P(s1, 0), P(s1 + a, off), P(s2 - a, off), P(s2, 0), p1];
 }
 
@@ -686,17 +686,12 @@ function linkGeom(l, autoOffset){
   var p1 = { x: b.x - ux * rb, y: b.y - uy * rb };
 
   var px = -uy, py = ux;
-  // เส้นคู่ขนาน: เลื่อนทั้งเส้นตามแนวตั้งฉาก ให้เป็นเส้นตรงขนานกันจริง ๆ
-  // (เดิมดันจุดควบคุมกลางเส้น ทำให้บวมเป็นเส้นโค้งคนละทิศ)
-  if (autoOffset){
-    p0.x += px * autoOffset; p0.y += py * autoOffset;
-    p1.x += px * autoOffset; p1.y += py * autoOffset;
-  }
+  // เส้นคู่: ปลายยังปักที่อุปกรณ์ทั้งสองข้าง ระยะถ่าง (fan) ไปโผล่เป็นช่วงขนานกลางเส้นแทน
   var off;
   if (l.curve === "auto" || l.curve == null){
-    off = autoAvoidOffset(l, p0, p1, px, py, 0);
+    off = autoAvoidOffset(l, p0, p1, px, py, autoOffset || 0);
   } else {
-    off = Number(l.curve) || 0;
+    off = (Number(l.curve) || 0) + (autoOffset || 0);
   }
   var pts = bendPts(p0, p1, px, py, off);
   var path = 'M' + pts[0].x + ',' + pts[0].y;
