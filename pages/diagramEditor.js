@@ -559,7 +559,7 @@ function deviceExtras(d){
     s += '<circle data-resize="1" cx="' + (w / 2) + '" cy="' + (h / 2) + '" r="11" fill="' + color + '" style="cursor:nwse-resize"/>'
       + '<path d="M' + (w / 2 - 4) + ',' + (h / 2 + 4) + ' L' + (w / 2 + 4) + ',' + (h / 2 - 4) + '" stroke="#fff" stroke-width="2"/>';
   } else {
-    var r = TYPE_META[d.type].r + 8;
+    var r = devR(d) + 8;
     s += '<circle r="' + r + '" fill="none" stroke="' + color + '" stroke-width="2.5" stroke-dasharray="6,5"/>';
     s += '<g data-connect="1" transform="translate(' + (r + 26) + ',0)" style="cursor:crosshair">'
       + '<circle r="34" fill="transparent"/>'
@@ -581,15 +581,47 @@ function deviceSvg(d){
   else if (d.type === "ipphone") inner = ipphoneSvg(d);
   else if (d.type === "cloud" || d.type === "mediacloud") inner = cloudSvg(d);
   else inner = boxSvg(d);
+  var sc = deviceScales[d.id] || 1;
+  if (sc !== 1) inner = '<g transform="scale(' + sc.toFixed(3) + ')">' + inner + '</g>';
   var hit;
   if (d.type === "box"){
     var w = d.w || 320, h = d.h || 200;
     hit = '<rect x="' + (-w / 2) + '" y="' + (-h / 2) + '" width="' + w + '" height="' + h + '" fill="transparent"/>';
   } else {
-    hit = '<circle r="' + TYPE_META[d.type].r + '" fill="transparent"/>';
+    hit = '<circle r="' + devR(d) + '" fill="transparent"/>';
   }
   return '<g data-id="' + d.id + '" transform="translate(' + d.x + ',' + d.y + ')" style="cursor:grab">'
     + hit + inner + deviceExtras(d) + '</g>';
+}
+
+// อุปกรณ์ที่มีสายคู่ขนานหลายเส้น ขยายไอคอนให้กว้างพอรับปลายเส้นทุกเส้น
+// (สาย 2 เส้นไอคอนปกติรับได้อยู่แล้ว จะเริ่มขยายเมื่อ 3 เส้นขึ้นไป)
+var deviceScales = {};
+function computeDeviceScales(){
+  deviceScales = {};
+  var groups = {};
+  state.links.forEach(function(l){
+    var key = Math.min(l.from, l.to) + "-" + Math.max(l.from, l.to);
+    groups[key] = (groups[key] || 0) + 1;
+  });
+  var maxOff = {};
+  Object.keys(groups).forEach(function(key){
+    var n = groups[key];
+    if (n < 2) return;
+    var off = (n - 1) * 56 / 2;
+    key.split("-").forEach(function(id){
+      maxOff[id] = Math.max(maxOff[id] || 0, off);
+    });
+  });
+  Object.keys(maxOff).forEach(function(id){
+    var d = findDev(Number(id));
+    if (!d || d.type === "box") return;
+    var scale = (maxOff[id] / 0.7 + 8) / TYPE_META[d.type].r;
+    if (scale > 1) deviceScales[id] = Math.min(2.5, scale);
+  });
+}
+function devR(d){
+  return TYPE_META[d.type].r * (deviceScales[d.id] || 1);
 }
 
 function linkOffsets(){
@@ -652,7 +684,7 @@ function autoAvoidOffset(l, p0, p1, px, py, base){
     var pts = bendPts(p0, p1, px, py, off);
     for (var oi = 0; oi < obstacles.length; oi++){
       var d = obstacles[oi];
-      var rr = TYPE_META[d.type].r + 16;
+      var rr = devR(d) + 16;
       for (var i = 0; i <= 24; i++){
         var p = polyAt(pts, i / 24);
         var dx = p.x - d.x, dy = p.y - d.y;
@@ -679,19 +711,24 @@ function linkGeom(l, autoOffset){
   var dx = b.x - a.x, dy = b.y - a.y;
   var len = Math.sqrt(dx * dx + dy * dy) || 1;
   var ux = dx / len, uy = dy / len;
-  var ra = a.type === "box" ? 0 : TYPE_META[a.type].r * 0.7;
-  var rb = b.type === "box" ? 0 : TYPE_META[b.type].r * 0.7;
+  var ra = a.type === "box" ? 0 : devR(a) * 0.7;
+  var rb = b.type === "box" ? 0 : devR(b) * 0.7;
   if (ra + rb > len - 20){ ra = 0; rb = 0; }
   var p0 = { x: a.x + ux * ra, y: a.y + uy * ra };
   var p1 = { x: b.x - ux * rb, y: b.y - uy * rb };
 
   var px = -uy, py = ux;
-  // เส้นคู่: ปลายยังปักที่อุปกรณ์ทั้งสองข้าง ระยะถ่าง (fan) ไปโผล่เป็นช่วงขนานกลางเส้นแทน
+  // เส้นคู่: เลื่อนทั้งเส้นให้ขนานกันจริง ๆ — อุปกรณ์จะถูกขยาย (deviceScales)
+  // ให้กว้างพอรับปลายเส้นทุกเส้น ส่วนการหลบสิ่งกีดขวางยังหักเหลี่ยมเหมือนเดิม
+  if (autoOffset){
+    p0.x += px * autoOffset; p0.y += py * autoOffset;
+    p1.x += px * autoOffset; p1.y += py * autoOffset;
+  }
   var off;
   if (l.curve === "auto" || l.curve == null){
-    off = autoAvoidOffset(l, p0, p1, px, py, autoOffset || 0);
+    off = autoAvoidOffset(l, p0, p1, px, py, 0);
   } else {
-    off = (Number(l.curve) || 0) + (autoOffset || 0);
+    off = Number(l.curve) || 0;
   }
   var pts = bendPts(p0, p1, px, py, off);
   var path = 'M' + pts[0].x + ',' + pts[0].y;
@@ -746,6 +783,7 @@ function titleBlock(){
 }
 
 function render(){
+  computeDeviceScales();
   var s = svgDefs() + '<rect width="1280" height="660" fill="#ffffff"/>' + titleBlock();
   var offsets = linkOffsets();
 
@@ -768,7 +806,7 @@ function render(){
     if (from){
       var ex = tgt ? tgt.x : connecting.x, ey = tgt ? tgt.y : connecting.y;
       if (tgt){
-        s += '<circle cx="' + tgt.x + '" cy="' + tgt.y + '" r="' + (TYPE_META[tgt.type].r + 12)
+        s += '<circle cx="' + tgt.x + '" cy="' + tgt.y + '" r="' + (devR(tgt) + 12)
           + '" fill="none" stroke="#1f6f6b" stroke-width="5" opacity="0.85"/>';
       }
       s += '<line x1="' + from.x + '" y1="' + from.y + '" x2="' + ex + '" y2="' + ey
@@ -794,7 +832,7 @@ function snapTarget(x, y, fromId){
   var best = null, bestDist = Infinity;
   state.devices.forEach(function(d){
     if (d.id === fromId || d.type === "box") return;
-    var dist = Math.sqrt((d.x - x) * (d.x - x) + (d.y - y) * (d.y - y)) - TYPE_META[d.type].r;
+    var dist = Math.sqrt((d.x - x) * (d.x - x) + (d.y - y) * (d.y - y)) - devR(d);
     if (dist < bestDist){ bestDist = dist; best = d; }
   });
   return bestDist <= 80 ? best : null;
