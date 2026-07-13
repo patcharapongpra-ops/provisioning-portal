@@ -602,7 +602,7 @@ function linkOffsets(){
   Object.keys(groups).forEach(function(key){
     var ids = groups[key];
     ids.forEach(function(id, i){
-      map[id] = ids.length > 1 ? (i - (ids.length - 1) / 2) * 90 : 0;
+      map[id] = ids.length > 1 ? (i - (ids.length - 1) / 2) * 56 : 0;
     });
   });
   return map;
@@ -661,11 +661,17 @@ function linkGeom(l, autoOffset){
   var p1 = { x: b.x - ux * rb, y: b.y - uy * rb };
 
   var px = -uy, py = ux;
+  // เส้นคู่ขนาน: เลื่อนทั้งเส้นตามแนวตั้งฉาก ให้เป็นเส้นตรงขนานกันจริง ๆ
+  // (เดิมดันจุดควบคุมกลางเส้น ทำให้บวมเป็นเส้นโค้งคนละทิศ)
+  if (autoOffset){
+    p0.x += px * autoOffset; p0.y += py * autoOffset;
+    p1.x += px * autoOffset; p1.y += py * autoOffset;
+  }
   var off;
   if (l.curve === "auto" || l.curve == null){
-    off = autoAvoidOffset(l, p0, p1, px, py, autoOffset || 0);
+    off = autoAvoidOffset(l, p0, p1, px, py, 0);
   } else {
-    off = (Number(l.curve) || 0) + (autoOffset || 0);
+    off = Number(l.curve) || 0;
   }
   var pc = { x: (p0.x + p1.x) / 2 + px * off, y: (p0.y + p1.y) / 2 + py * off };
   var path = 'M' + p0.x + ',' + p0.y + ' Q' + pc.x + ',' + pc.y + ' ' + p1.x + ',' + p1.y;
