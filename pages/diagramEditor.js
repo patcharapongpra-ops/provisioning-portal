@@ -608,12 +608,37 @@ function linkOffsets(){
   return map;
 }
 
-function bez(t, p0, pc, p1){
-  var mt = 1 - t;
-  return {
-    x: mt * mt * p0.x + 2 * mt * t * pc.x + t * t * p1.x,
-    y: mt * mt * p0.y + 2 * mt * t * pc.y + t * t * p1.y,
-  };
+function polyAt(pts, t){
+  var total = 0, lens = [];
+  for (var i = 0; i < pts.length - 1; i++){
+    var dx = pts[i + 1].x - pts[i].x, dy = pts[i + 1].y - pts[i].y;
+    var L = Math.sqrt(dx * dx + dy * dy);
+    lens.push(L); total += L;
+  }
+  var target = Math.max(0, Math.min(1, t)) * total;
+  for (var j = 0; j < lens.length; j++){
+    if (target <= lens[j] || j === lens.length - 1){
+      var u = lens[j] ? target / lens[j] : 0;
+      return { x: pts[j].x + (pts[j + 1].x - pts[j].x) * u, y: pts[j].y + (pts[j + 1].y - pts[j].y) * u };
+    }
+    target -= lens[j];
+  }
+  return pts[pts.length - 1];
+}
+
+// เส้นหลบแบบหักเหลี่ยม 45°: ตรง → เฉียงออก → ขนานแนวเดิม → เฉียงกลับ → ตรง
+// (แทนเส้นโค้ง bezier เดิม) ถ้าเส้นสั้นเกินจะหักยอดเดียวตรงกลางแทน
+function bendPts(p0, p1, px, py, off){
+  if (!off) return [p0, p1];
+  var dx = p1.x - p0.x, dy = p1.y - p0.y;
+  var len = Math.sqrt(dx * dx + dy * dy) || 1;
+  var ux = dx / len, uy = dy / len;
+  var a = Math.abs(off);
+  var h = Math.max(46, a * 0.8);
+  var s1 = len / 2 - h - a, s2 = len / 2 + h + a;
+  function P(s, o){ return { x: p0.x + ux * s + px * o, y: p0.y + uy * s + py * o }; }
+  if (s1 < 12) return [p0, P(len / 2, off), p1];
+  return [p0, P(s1, 0), P(s1 + a, off), P(s2 - a, off), P(s2, 0), p1];
 }
 
 function autoAvoidOffset(l, p0, p1, px, py, base){
@@ -624,12 +649,12 @@ function autoAvoidOffset(l, p0, p1, px, py, base){
   if (!obstacles.length) return base;
 
   function clears(off){
-    var pc = { x: (p0.x + p1.x) / 2 + px * off, y: (p0.y + p1.y) / 2 + py * off };
+    var pts = bendPts(p0, p1, px, py, off);
     for (var oi = 0; oi < obstacles.length; oi++){
       var d = obstacles[oi];
       var rr = TYPE_META[d.type].r + 16;
-      for (var i = 0; i <= 20; i++){
-        var p = bez(i / 20, p0, pc, p1);
+      for (var i = 0; i <= 24; i++){
+        var p = polyAt(pts, i / 24);
         var dx = p.x - d.x, dy = p.y - d.y;
         if (dx * dx + dy * dy < rr * rr) return false;
       }
@@ -673,9 +698,13 @@ function linkGeom(l, autoOffset){
   } else {
     off = Number(l.curve) || 0;
   }
-  var pc = { x: (p0.x + p1.x) / 2 + px * off, y: (p0.y + p1.y) / 2 + py * off };
-  var path = 'M' + p0.x + ',' + p0.y + ' Q' + pc.x + ',' + pc.y + ' ' + p1.x + ',' + p1.y;
-  return { st: st, p0: p0, p1: p1, pc: pc, px: px, py: py, path: path };
+  var pts = bendPts(p0, p1, px, py, off);
+  var path = 'M' + pts[0].x + ',' + pts[0].y;
+  for (var pi = 1; pi < pts.length; pi++) path += ' L' + pts[pi].x + ',' + pts[pi].y;
+  return {
+    st: st, p0: p0, p1: p1, px: px, py: py, path: path,
+    at: function(t){ return polyAt(pts, t); },
+  };
 }
 
 function linkStrokeSvg(l, g){
@@ -693,7 +722,7 @@ function linkStrokeSvg(l, g){
 function linkLabelsSvg(l, g){
   function lab(t, text, size, color){
     if (!text) return "";
-    var p = bez(t, g.p0, g.pc, g.p1);
+    var p = g.at(t);
     return '<text x="' + (p.x + g.px * -18) + '" y="' + (p.y + g.py * -18) + '" text-anchor="middle" font-size="' + size + '" fill="' + color + '"' + HALO + '>' + esc(text) + '</text>';
   }
   var s = lab(0.18, l.labelA, 14, "#333")
@@ -703,7 +732,7 @@ function linkLabelsSvg(l, g){
   if (l.vlan){
     var vt = "VLAN " + l.vlan;
     var w = vt.length * 8.5 + 18;
-    var p = bez(0.5, g.p0, g.pc, g.p1);
+    var p = g.at(0.5);
     var cx = p.x + g.px * 24, cy = p.y + g.py * 24;
     s += '<g transform="translate(' + cx + ',' + cy + ')">'
       + '<rect x="' + (-w / 2) + '" y="-12" width="' + w + '" height="24" rx="12" fill="#eef4fb" stroke="#8fb8dd" stroke-width="1.5"/>'
