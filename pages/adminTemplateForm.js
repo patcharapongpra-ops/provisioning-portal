@@ -37,7 +37,7 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
     <main class="container wide-container">
     <section class="hero">
       <h1>${isEdit ? "แก้ไข Template" : "สร้าง Template"}</h1>
-      <p>แปะ config จริงลงไป แล้วลากคลุมคำที่อยากให้เปลี่ยนค่า เลือกว่าจะให้ user กรอกเอง หรือดึงจากช่องอื่น (เช่น IP +1)</p>
+      <p>แปะ config จริงลงไป แล้วพิมพ์ <code>{{ชื่อช่อง}}</code> ตรงไหนก็ได้ (ซ้ำกี่จุดก็ได้) ระบบจะสร้างช่องให้อัตโนมัติ — หรือลากคลุมคำแล้วกดปุ่มแบบเดิมก็ได้</p>
     </section>
 
     ${error ? `<div class="alert error">${escapeHtml(error)}</div>` : ""}
@@ -65,11 +65,11 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         </label>
       </section>
 
-      <section class="panel">
+      <section class="panel tpl-config-panel">
         <div class="panel-title-row">
           <div>
             <h2>Config</h2>
-            <p class="muted">แปะ config แล้วลากคลุมคำ → กดปุ่มเพื่อทำเป็นช่อง</p>
+            <p class="muted">พิมพ์ {{KEY}} ในเนื้อ config ได้เลย ช่องจะโผล่ในตารางเอง · หรือลากคลุมคำ → กดปุ่ม</p>
           </div>
           <div class="action-row">
             <button type="button" class="small-btn" onclick="openPanel('input')">＋ ช่องกรอก</button>
@@ -77,7 +77,22 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
           </div>
         </div>
 
-        <textarea id="config-src" rows="12" placeholder="แปะ config ที่นี่ เช่น&#10;hostname CORE-01&#10; ip address 10.10.20.1 255.255.255.0">${escapeHtml(t.template_text || "")}</textarea>
+        <div class="tpl-edit-grid">
+          <div class="tpl-src-col">
+            <textarea id="config-src" rows="14" placeholder="แปะ config ที่นี่ เช่น&#10;hostname CORE-01&#10; ip address 10.10.20.1 255.255.255.0">${escapeHtml(t.template_text || "")}</textarea>
+          </div>
+
+          <div class="tpl-resizer" id="tpl-resizer" title="ลากเพื่อปรับความกว้าง"></div>
+
+          <div class="tpl-field-col">
+            <table>
+              <thead>
+                <tr><th>ช่อง</th><th>ชนิด</th><th>ค่าตัวอย่าง</th><th>ลำดับ</th><th></th></tr>
+              </thead>
+              <tbody id="field-list"></tbody>
+            </table>
+          </div>
+        </div>
 
         <div id="add-panel" class="help-box" style="display:none;margin-top:14px">
           <div class="form-row">
@@ -131,18 +146,11 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
             <button type="button" class="small-btn" onclick="closePanel()">ยกเลิก</button>
           </div>
         </div>
-
-        <table style="margin-top:16px">
-          <thead>
-            <tr><th>Placeholder</th><th>Label</th><th>ชนิด</th><th>ค่าตัวอย่าง</th><th>ลำดับ</th><th></th></tr>
-          </thead>
-          <tbody id="field-list"></tbody>
-        </table>
       </section>
 
       <section class="panel">
         <h2>ตัวอย่างผลลัพธ์ (Preview)</h2>
-        <p class="muted">คำนวณสดจาก "ค่าตัวอย่าง" ด้านบน</p>
+        <p class="muted">จุดสีคือตำแหน่งที่ค่าจะถูกเปลี่ยน — <span class="pv-slot pv-filled">เขียว</span> จากช่องกรอก · <span class="pv-slot pv-derived">ฟ้า</span> คำนวณอัตโนมัติ · <span class="pv-slot pv-missing">เหลือง</span> ยังไม่มีค่าตัวอย่าง</p>
         <pre id="preview" class="config-output"></pre>
       </section>
 
@@ -157,6 +165,7 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
       var model = JSON.parse(document.getElementById("init-data").textContent || "[]");
       var srcEl = document.getElementById("config-src");
       var lastSel = { start: 0, end: 0, text: "" };
+      var editIdx = -1;
 
       var TRANSFORMS = [
         ["raw", "ใช้ค่าตรง"],
@@ -195,22 +204,15 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
       srcEl.addEventListener("mouseup", grabSel);
       srcEl.addEventListener("keyup", grabSel);
 
-      function openPanel(kind) {
-        if (!lastSel.text) { alert("ลากคลุมคำในคอนฟิกก่อน แล้วค่อยกดปุ่มนี้"); return; }
-        document.getElementById("ap-selected").value = lastSel.text;
-        document.getElementById("ap-key").value = keyify(lastSel.text);
-        document.getElementById("ap-label").value = "";
-        document.getElementById("ap-kind").value = kind;
-        document.getElementById("ap-inputtype").value = "text";
-        document.getElementById("ap-options").value = "";
-
+      function populateSelects(excludeKey, sourceValue, transformValue) {
         var src = document.getElementById("ap-source");
         src.innerHTML = "";
-        model.filter(function (f) { return f.kind === "input"; }).forEach(function (f) {
+        model.filter(function (f) { return f.kind === "input" && f.key !== excludeKey; }).forEach(function (f) {
           var o = document.createElement("option");
           o.value = f.key; o.textContent = "{{" + f.key + "}}";
           src.appendChild(o);
         });
+        if (sourceValue) src.value = sourceValue;
 
         var tr = document.getElementById("ap-transform");
         tr.innerHTML = "";
@@ -219,13 +221,50 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
           o.value = x[0]; o.textContent = x[1];
           tr.appendChild(o);
         });
+        if (transformValue) tr.value = transformValue;
+      }
 
+      function openPanel(kind) {
+        if (!lastSel.text) { alert("ลากคลุมคำในคอนฟิกก่อน แล้วค่อยกดปุ่มนี้"); return; }
+        editIdx = -1;
+        var keyEl = document.getElementById("ap-key");
+        keyEl.readOnly = false;
+        document.getElementById("ap-selected").value = lastSel.text;
+        keyEl.value = keyify(lastSel.text);
+        document.getElementById("ap-label").value = "";
+        document.getElementById("ap-kind").value = kind;
+        document.getElementById("ap-inputtype").value = "text";
+        document.getElementById("ap-options").value = "";
+        document.getElementById("ap-tvalue").value = "1";
+
+        populateSelects("", "", "");
         toggleKind();
         toggleTValue();
         toggleInputType();
         document.getElementById("add-panel").style.display = "block";
       }
-      function closePanel() { document.getElementById("add-panel").style.display = "none"; }
+
+      function openEdit(idx) {
+        var f = model[idx];
+        editIdx = idx;
+        var keyEl = document.getElementById("ap-key");
+        document.getElementById("ap-selected").value = "{{" + f.key + "}}";
+        keyEl.value = f.key;
+        keyEl.readOnly = true;
+        document.getElementById("ap-label").value = f.label || "";
+        document.getElementById("ap-kind").value = f.kind;
+        document.getElementById("ap-inputtype").value = f.inputType === "select" ? "select" : "text";
+        document.getElementById("ap-options").value = f.options || "";
+        document.getElementById("ap-tvalue").value = f.transformValue || "1";
+
+        populateSelects(f.key, f.source || "", f.transform || "raw");
+        toggleKind();
+        toggleTValue();
+        toggleInputType();
+        document.getElementById("add-panel").style.display = "block";
+      }
+
+      function closePanel() { editIdx = -1; document.getElementById("add-panel").style.display = "none"; }
       function toggleKind() {
         var d = document.getElementById("ap-kind").value === "derived";
         document.getElementById("ap-derived").style.display = d ? "block" : "none";
@@ -250,13 +289,15 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
       }
 
       function confirmAdd() {
-        var key = keyify(document.getElementById("ap-key").value);
+        var isEditMode = editIdx >= 0;
+        var old = isEditMode ? model[editIdx] : null;
+        var key = isEditMode ? old.key : keyify(document.getElementById("ap-key").value);
         if (!key) { alert("กรุณาตั้งชื่อช่อง (KEY)"); return; }
-        if (model.some(function (f) { return f.key === key; })) { alert("ชื่อช่องนี้มีแล้ว"); return; }
+        if (!isEditMode && model.some(function (f) { return f.key === key; })) { alert("ชื่อช่องนี้มีแล้ว"); return; }
 
         var kind = document.getElementById("ap-kind").value;
         var label = document.getElementById("ap-label").value.trim() || key;
-        var field = { key: key, label: label, kind: kind, source: "", transform: "raw", transformValue: "", sample: "", inputType: "text", options: "" };
+        var field = { key: key, label: label, kind: kind, source: "", transform: "raw", transformValue: "", sample: "", inputType: "text", options: "", missing: old ? old.missing : false };
 
         if (kind === "input") {
           var itype = document.getElementById("ap-inputtype").value;
@@ -266,10 +307,11 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
             if (!opts.length) { alert("Dropdown ต้องมีอย่างน้อย 1 ตัวเลือก"); return; }
             field.inputType = "select";
             field.options = optText;
-            field.sample = opts[0].value;
+            var keepSample = old && opts.some(function (o) { return o.value === old.sample; });
+            field.sample = keepSample ? old.sample : opts[0].value;
           } else {
             field.inputType = "text";
-            field.sample = lastSel.text;
+            field.sample = old && old.kind === "input" ? (old.sample || "") : lastSel.text;
           }
         } else {
           var source = document.getElementById("ap-source").value;
@@ -279,11 +321,16 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
           field.transformValue = NEEDVAL[field.transform] ? document.getElementById("ap-tvalue").value : "";
         }
 
-        var token = "{{" + key + "}}";
-        srcEl.value = srcEl.value.slice(0, lastSel.start) + token + srcEl.value.slice(lastSel.end);
-        model.push(field);
-        lastSel = { start: 0, end: 0, text: "" };
+        if (isEditMode) {
+          model[editIdx] = field;
+        } else {
+          var token = "{{" + key + "}}";
+          srcEl.value = srcEl.value.slice(0, lastSel.start) + token + srcEl.value.slice(lastSel.end);
+          model.push(field);
+          lastSel = { start: 0, end: 0, text: "" };
+        }
         closePanel();
+        syncModelFromText();
         renderList();
         renderPreview();
       }
@@ -303,16 +350,37 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
           var tr0 = document.createElement("tr");
           var td0 = document.createElement("td");
           td0.colSpan = 5; td0.className = "muted";
-          td0.textContent = "ยังไม่มีช่อง — ลากคลุมคำในคอนฟิกแล้วกดปุ่มด้านบน";
+          td0.textContent = "ยังไม่มีช่อง — พิมพ์ {{KEY}} ในคอนฟิก หรือลากคลุมคำแล้วกดปุ่มด้านบน";
           tr0.appendChild(td0); tb.appendChild(tr0); return;
         }
         model.forEach(function (f, idx) {
           var tr = document.createElement("tr");
-          var c1 = document.createElement("td"); c1.textContent = "{{" + f.key + "}}"; c1.style.fontFamily = "monospace"; tr.appendChild(c1);
-          var c2 = document.createElement("td"); c2.textContent = f.label; tr.appendChild(c2);
+          if (f.missing) tr.className = "row-missing";
+          var c1 = document.createElement("td");
+          var lbl = document.createElement("input");
+          lbl.type = "text"; lbl.value = f.label || ""; lbl.placeholder = f.key; lbl.style.width = "140px";
+          lbl.addEventListener("input", function () { f.label = lbl.value; });
+          c1.appendChild(lbl);
+          var keyTag = document.createElement("div");
+          keyTag.className = "muted";
+          keyTag.style.fontFamily = "monospace";
+          keyTag.style.fontSize = "11px";
+          keyTag.style.marginTop = "4px";
+          keyTag.textContent = "{{" + f.key + "}}";
+          c1.appendChild(keyTag);
+          if (f.missing) {
+            var warn = document.createElement("span");
+            warn.className = "field-warn";
+            warn.textContent = "ไม่พบใน config — จะไม่ถูกบันทึก";
+            c1.appendChild(warn);
+          }
+          tr.appendChild(c1);
           var c3 = document.createElement("td");
           if (f.kind === "input") c3.textContent = f.inputType === "select" ? "Dropdown" : "ช่องกรอก";
-          else c3.textContent = "ดึงจาก {{" + f.source + "}} · " + transformLabel(f.transform) + (NEEDVAL[f.transform] ? (" " + f.transformValue) : "");
+          else {
+            c3.textContent = "ดึงจาก {{" + f.source + "}} · " + transformLabel(f.transform) + (NEEDVAL[f.transform] ? (" " + f.transformValue) : "");
+            c3.style.fontSize = "12.5px";
+          }
           tr.appendChild(c3);
           var c4 = document.createElement("td");
           if (f.kind === "input" && f.inputType === "select") {
@@ -341,9 +409,13 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
           dn.addEventListener("click", function () { moveField(idx, 1); });
           mv.appendChild(up); mv.appendChild(dn); cm.appendChild(mv); tr.appendChild(cm);
           var c5 = document.createElement("td");
+          var actions = document.createElement("div"); actions.className = "move-btns";
+          var ed = document.createElement("button"); ed.type = "button"; ed.className = "mini-btn"; ed.textContent = "แก้ไข";
+          ed.addEventListener("click", function () { openEdit(idx); });
           var b = document.createElement("button"); b.type = "button"; b.className = "mini-btn"; b.textContent = "✕";
           b.addEventListener("click", function () { removeField(idx); });
-          c5.appendChild(b); tr.appendChild(c5);
+          actions.appendChild(ed); actions.appendChild(b);
+          c5.appendChild(actions); tr.appendChild(c5);
           tb.appendChild(tr);
         });
       }
@@ -396,23 +468,79 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
 
       function renderPreview() {
         var values = {};
-        model.forEach(function (f) { if (f.kind === "input") values[f.key] = f.sample || ""; });
+        var byKey = {};
+        model.forEach(function (f) { byKey[f.key] = f; if (f.kind === "input") values[f.key] = f.sample || ""; });
         model.forEach(function (f) {
           if (f.kind === "derived") {
             var sv = values[f.source] !== undefined ? values[f.source] : "";
-            values[f.key] = applyTransform(sv, f.transform, f.transformValue);
+            values[f.key] = sv ? applyTransform(sv, f.transform, f.transformValue) : "";
           }
         });
-        var out = srcEl.value;
-        model.forEach(function (f) { out = out.split("{{" + f.key + "}}").join(values[f.key] !== undefined ? values[f.key] : ""); });
-        document.getElementById("preview").textContent = out;
+
+        var pre = document.getElementById("preview");
+        pre.innerHTML = "";
+        var text = srcEl.value;
+        var re = /\\{\\{([A-Z0-9_]+)\\}\\}/g;
+        var last = 0;
+        var m;
+        while ((m = re.exec(text))) {
+          if (m.index > last) pre.appendChild(document.createTextNode(text.slice(last, m.index)));
+          var f = byKey[m[1]];
+          var span = document.createElement("span");
+          if (!f) {
+            span.textContent = m[0];
+          } else {
+            var v = values[f.key] || "";
+            if (f.kind === "derived") {
+              span.className = "pv-slot pv-derived";
+              span.title = "คำนวณอัตโนมัติจาก {{" + f.source + "}}";
+            } else if (v) {
+              span.className = "pv-slot pv-filled";
+              span.title = f.label || f.key;
+            } else {
+              span.className = "pv-slot pv-missing";
+              span.title = (f.label || f.key) + " — ใส่ค่าตัวอย่างในตารางเพื่อดูผล";
+            }
+            span.textContent = v || "\\u27E8" + (f.label || f.key) + "\\u27E9";
+          }
+          pre.appendChild(span);
+          last = re.lastIndex;
+        }
+        if (last < text.length) pre.appendChild(document.createTextNode(text.slice(last)));
       }
 
-      srcEl.addEventListener("input", renderPreview);
+      function syncModelFromText() {
+        var found = {};
+        var re = /\\{\\{([A-Z0-9_]+)\\}\\}/g;
+        var m;
+        while ((m = re.exec(srcEl.value))) found[m[1]] = true;
+        var known = {};
+        model.forEach(function (f) { known[f.key] = true; f.missing = !found[f.key]; });
+        Object.keys(found).forEach(function (key) {
+          if (known[key]) return;
+          model.push({ key: key, label: key, kind: "input", source: "", transform: "raw", transformValue: "", sample: "", inputType: "text", options: "", missing: false });
+        });
+        // ช่องที่ไม่อยู่ในเนื้อ config แต่ถูกช่องอื่นดึงค่าไปใช้ ยังถือว่าใช้งานอยู่
+        model.forEach(function (f) {
+          if (f.missing || !f.source) return;
+          model.forEach(function (s) { if (s.key === f.source) s.missing = false; });
+        });
+      }
+
+      srcEl.addEventListener("input", function () {
+        syncModelFromText();
+        renderList();
+        renderPreview();
+      });
 
       function prepareSubmit() {
-        if (!model.length) { alert("ต้องมีอย่างน้อย 1 ช่อง"); return false; }
-        var out = model.map(function (f, i) {
+        var active = model.filter(function (f) { return !f.missing; });
+        if (!active.length) { alert("ต้องมีอย่างน้อย 1 ช่อง"); return false; }
+        if (active.length !== model.length) {
+          var dropped = model.length - active.length;
+          if (!confirm("มี " + dropped + " ช่องที่ไม่พบใน config จะถูกตัดออก — บันทึกต่อเลยไหม?")) return false;
+        }
+        var out = active.map(function (f, i) {
           var isSelect = f.kind === "input" && f.inputType === "select";
           return {
             field_key: f.key,
@@ -433,8 +561,43 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         return true;
       }
 
+      syncModelFromText();
       renderList();
       renderPreview();
+
+      (function () {
+        var grid = document.querySelector(".tpl-edit-grid");
+        var handle = document.getElementById("tpl-resizer");
+        if (!grid || !handle) return;
+        try {
+          var saved = localStorage.getItem("tplSplit");
+          if (saved) grid.style.setProperty("--tpl-split", saved);
+        } catch (e) {}
+
+        handle.addEventListener("pointerdown", function (e) {
+          e.preventDefault();
+          handle.classList.add("dragging");
+          handle.setPointerCapture(e.pointerId);
+          document.body.style.userSelect = "none";
+
+          function onMove(ev) {
+            var rect = grid.getBoundingClientRect();
+            var pct = ((ev.clientX - rect.left) / rect.width) * 100;
+            pct = Math.max(20, Math.min(70, pct));
+            grid.style.setProperty("--tpl-split", pct.toFixed(1) + "%");
+          }
+          function onUp(ev) {
+            handle.classList.remove("dragging");
+            handle.releasePointerCapture(ev.pointerId);
+            document.body.style.userSelect = "";
+            handle.removeEventListener("pointermove", onMove);
+            handle.removeEventListener("pointerup", onUp);
+            try { localStorage.setItem("tplSplit", grid.style.getPropertyValue("--tpl-split")); } catch (err) {}
+          }
+          handle.addEventListener("pointermove", onMove);
+          handle.addEventListener("pointerup", onUp);
+        });
+      })();
     </script>
     </main>
   </div>

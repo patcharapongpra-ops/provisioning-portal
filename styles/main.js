@@ -1100,5 +1100,196 @@ textarea:focus-visible {
 @media (max-width: 640px) {
   .login-card { padding: 32px 22px 26px; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Config Generator — live preview                                     */
+/* ------------------------------------------------------------------ */
+.config-live-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.stack-fields {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.pv-slot {
+  border-radius: 5px;
+  padding: 0 5px;
+  font-weight: 600;
+}
+
+.pv-missing {
+  background: rgba(250, 200, 70, 0.14);
+  color: #f3c14b;
+  border: 1px dashed rgba(250, 200, 70, 0.6);
+  cursor: pointer;
+}
+
+.pv-filled {
+  background: rgba(96, 220, 140, 0.14);
+  color: #7ce0a3;
+  cursor: pointer;
+}
+
+.pv-derived {
+  background: rgba(130, 175, 255, 0.15);
+  color: #9cc0ff;
+}
+
+.live-status {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.live-status.ok { color: #3fae6a; }
+
+tr.row-missing td { opacity: 0.55; }
+
+.field-warn {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c98a00;
+}
+
+@media (max-width: 960px) {
+  .config-live-grid { grid-template-columns: 1fr; }
+}
+
+/* Template editor — config source + field table side by side */
+.tpl-config-panel { overflow: visible; }
+
+.tpl-edit-grid {
+  --tpl-split: 50%;
+  display: grid;
+  grid-template-columns: minmax(260px, min(var(--tpl-split), calc(100% - 340px))) 8px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+/* เส้นคั่นลากปรับสัดส่วนซ้าย-ขวา */
+.tpl-resizer {
+  align-self: stretch;
+  cursor: col-resize;
+  position: relative;
+  touch-action: none;
+}
+
+.tpl-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--hairline-strong);
+}
+
+.tpl-resizer:hover::before,
+.tpl-resizer.dragging::before {
+  background: var(--accent);
+}
+
+/* ช่อง config ล็อกติดจอ ระหว่างเลื่อนดูตาราง field ยาว ๆ */
+.tpl-src-col {
+  position: sticky;
+  top: 16px;
+  align-self: start;
+}
+
+.tpl-src-col textarea {
+  width: 100%;
+  min-height: 340px;
+  height: 72vh;
+  resize: vertical;
+}
+
+.tpl-field-col {
+  overflow-x: auto;
+}
+
+.tpl-field-col table { margin-top: 0; }
+
+@media (max-width: 1100px) {
+  .tpl-edit-grid { grid-template-columns: 1fr; }
+  .tpl-resizer { display: none; }
+  .tpl-src-col { position: static; }
+  .tpl-src-col textarea { height: auto; min-height: 260px; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Collapsible sidebar                                                 */
+/* ------------------------------------------------------------------ */
+.sidebar { transition: width 0.15s ease, padding 0.15s ease; }
+
+.sidebar-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sidebar-collapse {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-3);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sidebar-collapse:hover { background: var(--surface-2); color: var(--ink); }
+
+.wordmark-mini {
+  display: none;
+  font-family: var(--font-serif);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--ink);
+  margin: 0;
+}
+
+html[data-sidebar="collapsed"] .sidebar {
+  width: 54px;
+  padding: 18px 12px;
+}
+
+html[data-sidebar="collapsed"] .sidebar-head {
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+html[data-sidebar="collapsed"] .sidebar .wordmark,
+html[data-sidebar="collapsed"] .sidebar .nav-group,
+html[data-sidebar="collapsed"] .sidebar .sidebar-foot { display: none; }
+
+html[data-sidebar="collapsed"] .wordmark-mini { display: block; }
+
+/* จอแคบ sidebar เป็นแถบบนอยู่แล้ว — ปิดโหมดพับ */
+@media (max-width: 900px) {
+  .sidebar-collapse, .wordmark-mini { display: none !important; }
+
+  html[data-sidebar="collapsed"] .sidebar {
+    width: 100%;
+    padding: 14px 18px;
+  }
+
+  html[data-sidebar="collapsed"] .sidebar .wordmark { display: none; }
+  html[data-sidebar="collapsed"] .sidebar .nav-group { display: flex; }
+  html[data-sidebar="collapsed"] .sidebar .sidebar-foot { display: flex; }
+}
 `;
 }

@@ -63,7 +63,11 @@ export function renderSidebar(user, active) {
 
   return `
   <aside class="sidebar">
-    <p class="wordmark">Provisioning<span>Portal</span></p>
+    <div class="sidebar-head">
+      <p class="wordmark">Provisioning<span>Portal</span></p>
+      <button class="sidebar-collapse" id="sidebarToggle" type="button" title="พับเมนู">&laquo;</button>
+      <p class="wordmark-mini">P</p>
+    </div>
 
     ${groupsHtml}
 
@@ -100,6 +104,23 @@ export function renderSidebar(user, active) {
         setLabel(next);
       });
     })();
+
+    (function () {
+      var btn = document.getElementById("sidebarToggle");
+      if (!btn) return;
+      function apply(collapsed) {
+        if (collapsed) document.documentElement.setAttribute("data-sidebar", "collapsed");
+        else document.documentElement.removeAttribute("data-sidebar");
+        btn.innerHTML = collapsed ? "&raquo;" : "&laquo;";
+        btn.title = collapsed ? "ขยายเมนู" : "พับเมนู";
+      }
+      apply(document.documentElement.getAttribute("data-sidebar") === "collapsed");
+      btn.addEventListener("click", function () {
+        var next = document.documentElement.getAttribute("data-sidebar") !== "collapsed";
+        apply(next);
+        try { localStorage.setItem("sidebar", next ? "collapsed" : ""); } catch (e) {}
+      });
+    })();
   </script>
   `;
 }
@@ -111,6 +132,7 @@ export function themeInitScript() {
       try {
         var t = localStorage.getItem("theme");
         if (t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+        if (localStorage.getItem("sidebar") === "collapsed") document.documentElement.setAttribute("data-sidebar", "collapsed");
       } catch (e) {}
     })();
   </script>`;
