@@ -177,7 +177,10 @@ export function configPage({
     <section class="panel" id="result-panel">
       <div class="panel-title-row">
         <h2>Result Config</h2>
-        <button class="small-btn" onclick="copyConfig()">Copy</button>
+        <div class="action-row">
+          <button class="small-btn" onclick="copyConfig()">Copy</button>
+          <button class="small-btn" onclick="downloadConfig()">ดาวน์โหลด .txt</button>
+        </div>
       </div>
 
       <pre id="config-output" class="config-output">${escapeHtml(output)}</pre>
@@ -188,6 +191,20 @@ export function configPage({
         const text = document.getElementById("config-output").innerText;
         navigator.clipboard.writeText(text);
         alert("Copied config");
+      }
+      function downloadConfig() {
+        var text = document.getElementById("config-output").innerText;
+        var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        var d = new Date();
+        function pad(n) { return (n < 10 ? "0" : "") + n; }
+        var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes());
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = ${JSON.stringify(fileSafeName(selectedTemplate ? selectedTemplate.name : "config"))} + "_" + stamp + ".txt";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
       }
       document.getElementById("result-panel").scrollIntoView({ behavior: "smooth" });
     </script>
@@ -330,6 +347,16 @@ export function configPage({
 </body>
 </html>
 `;
+}
+
+function fileSafeName(name) {
+  return (
+    String(name || "config")
+      .trim()
+      .replace(/[^\w฀-๿.-]+/g, "-")
+      .replace(/-{2,}/g, "-")
+      .replace(/^-+|-+$/g, "") || "config"
+  );
 }
 
 function parseOptions(optionsText) {
