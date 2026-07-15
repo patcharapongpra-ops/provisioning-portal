@@ -94,6 +94,7 @@ export function configPage({
     ? {
         id: selectedTemplate.id,
         fileName: fileSafeName(selectedTemplate.name),
+        deviceType: fileSafeName(selectedTemplate.device_type_name || ""),
         text: selectedTemplate.template_text || "",
         fields: fields.map((field) => ({
           key: field.field_key,
@@ -323,15 +324,35 @@ export function configPage({
           alert("Copied config");
         };
 
-        window.downloadConfig = function () {
-          if (!confirmIfIncomplete()) return;
-          var blob = new Blob([pre.textContent], { type: "text/plain;charset=utf-8" });
+        function cleanPart(s) {
+          return String(s || "").trim()
+            .replace(/[^\\w\\u0E00-\\u0E7F.-]+/g, "-")
+            .replace(/-{2,}/g, "-")
+            .replace(/^-+|-+$/g, "");
+        }
+
+        // ชื่อไฟล์: <CID>_<Customer>_<DeviceType>.txt ถ้ามีช่อง CID
+        // ไม่มีก็ใช้ชื่อ template + เวลา แบบเดิม
+        function buildFileName(values) {
+          function partByKey(re) {
+            var f = DATA.fields.filter(function (x) { return x.input && re.test(x.key); })[0];
+            return f ? cleanPart(values[f.key]) : "";
+          }
+          var cid = partByKey(/(^|_)CID($|_)/);
+          var cust = partByKey(/(^|_)(CUSTOMER|CUST)($|_)/);
+          if (cid) return [cid, cust, DATA.deviceType].filter(Boolean).join("_");
           var d = new Date();
           function pad(n) { return (n < 10 ? "0" : "") + n; }
           var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes());
+          return DATA.fileName + "_" + stamp;
+        }
+
+        window.downloadConfig = function () {
+          if (!confirmIfIncomplete()) return;
+          var blob = new Blob([pre.textContent], { type: "text/plain;charset=utf-8" });
           var a = document.createElement("a");
           a.href = URL.createObjectURL(blob);
-          a.download = DATA.fileName + "_" + stamp + ".txt";
+          a.download = buildFileName(computeValues()) + ".txt";
           document.body.appendChild(a);
           a.click();
           a.remove();
