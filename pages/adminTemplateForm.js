@@ -16,6 +16,8 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
     sample: f.default_value || "",
     inputType: f.input_type === "select" ? "select" : "text",
     options: f.options_text || "",
+    keep: true,
+    auto: false,
   }));
 
   const initJson = JSON.stringify(initialModel).replace(/</g, "\\u003c");
@@ -37,7 +39,7 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
     <main class="container wide-container">
     <section class="hero">
       <h1>${isEdit ? "แก้ไข Template" : "สร้าง Template"}</h1>
-      <p>แปะ config จริงลงไป แล้วพิมพ์ <code>{{ชื่อช่อง}}</code> ตรงไหนก็ได้ (ซ้ำกี่จุดก็ได้) ระบบจะสร้างช่องให้อัตโนมัติ — หรือลากคลุมคำแล้วกดปุ่มแบบเดิมก็ได้</p>
+      <p>แปะ config จริงลงไป แล้วพิมพ์ <code>{{ชื่อช่อง}}</code> ตรงไหนก็ได้ (ซ้ำกี่จุดก็ได้) ระบบจะสร้างช่องให้อัตโนมัติ</p>
     </section>
 
     ${error ? `<div class="alert error">${escapeHtml(error)}</div>` : ""}
@@ -69,11 +71,10 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         <div class="panel-title-row">
           <div>
             <h2>Config</h2>
-            <p class="muted">พิมพ์ {{KEY}} ในเนื้อ config ได้เลย ช่องจะโผล่ในตารางเอง · หรือลากคลุมคำ → กดปุ่ม</p>
+            <p class="muted">พิมพ์ {{KEY}} ในเนื้อ config ได้เลย ช่องจะโผล่ในตารางเอง · ปุ่มขวาไว้สร้างช่องพักค่าให้ช่องอื่นดึงต่อ</p>
           </div>
           <div class="action-row">
-            <button type="button" class="small-btn" onclick="openPanel('input')">＋ ช่องกรอก</button>
-            <button type="button" class="small-btn" onclick="openPanel('derived')">＝ ดึงจากช่องเดิม</button>
+            <button type="button" class="small-btn" onclick="openHolder()">＋ ช่องเก็บค่า (ไม่แสดงใน config)</button>
           </div>
         </div>
 
@@ -164,8 +165,9 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
     <script>
       var model = JSON.parse(document.getElementById("init-data").textContent || "[]");
       var srcEl = document.getElementById("config-src");
-      var lastSel = { start: 0, end: 0, text: "" };
       var editIdx = -1;
+      var holderMode = false;
+      var textTokens = {};
 
       var TRANSFORMS = [
         ["raw", "ใช้ค่าตรง"],
@@ -192,18 +194,6 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         return String(s || "").toUpperCase().replace(/[^A-Z0-9_]/g, "_").replace(/^_+|_+$/g, "");
       }
 
-      function grabSel() {
-        if (srcEl.selectionStart !== srcEl.selectionEnd) {
-          lastSel = {
-            start: srcEl.selectionStart,
-            end: srcEl.selectionEnd,
-            text: srcEl.value.substring(srcEl.selectionStart, srcEl.selectionEnd)
-          };
-        }
-      }
-      srcEl.addEventListener("mouseup", grabSel);
-      srcEl.addEventListener("keyup", grabSel);
-
       function populateSelects(excludeKey, sourceValue, transformValue) {
         var src = document.getElementById("ap-source");
         src.innerHTML = "";
@@ -224,15 +214,17 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         if (transformValue) tr.value = transformValue;
       }
 
-      function openPanel(kind) {
-        if (!lastSel.text) { alert("ลากคลุมคำในคอนฟิกก่อน แล้วค่อยกดปุ่มนี้"); return; }
+      function openHolder() {
         editIdx = -1;
+        holderMode = true;
         var keyEl = document.getElementById("ap-key");
+        var kindEl = document.getElementById("ap-kind");
         keyEl.readOnly = false;
-        document.getElementById("ap-selected").value = lastSel.text;
-        keyEl.value = keyify(lastSel.text);
+        keyEl.value = "";
+        document.getElementById("ap-selected").value = "(ช่องเก็บค่า — ให้ user กรอก แล้วช่องอื่นดึงไปใช้)";
         document.getElementById("ap-label").value = "";
-        document.getElementById("ap-kind").value = kind;
+        kindEl.value = "input";
+        kindEl.disabled = true;
         document.getElementById("ap-inputtype").value = "text";
         document.getElementById("ap-options").value = "";
         document.getElementById("ap-tvalue").value = "1";
@@ -242,17 +234,21 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         toggleTValue();
         toggleInputType();
         document.getElementById("add-panel").style.display = "block";
+        keyEl.focus();
       }
 
       function openEdit(idx) {
         var f = model[idx];
         editIdx = idx;
+        holderMode = false;
         var keyEl = document.getElementById("ap-key");
         document.getElementById("ap-selected").value = "{{" + f.key + "}}";
         keyEl.value = f.key;
         keyEl.readOnly = true;
         document.getElementById("ap-label").value = f.label || "";
-        document.getElementById("ap-kind").value = f.kind;
+        var kindEl = document.getElementById("ap-kind");
+        kindEl.disabled = false;
+        kindEl.value = f.kind;
         document.getElementById("ap-inputtype").value = f.inputType === "select" ? "select" : "text";
         document.getElementById("ap-options").value = f.options || "";
         document.getElementById("ap-tvalue").value = f.transformValue || "1";
@@ -264,7 +260,12 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         document.getElementById("add-panel").style.display = "block";
       }
 
-      function closePanel() { editIdx = -1; document.getElementById("add-panel").style.display = "none"; }
+      function closePanel() {
+        editIdx = -1;
+        holderMode = false;
+        document.getElementById("ap-kind").disabled = false;
+        document.getElementById("add-panel").style.display = "none";
+      }
       function toggleKind() {
         var d = document.getElementById("ap-kind").value === "derived";
         document.getElementById("ap-derived").style.display = d ? "block" : "none";
@@ -290,6 +291,7 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
 
       function confirmAdd() {
         var isEditMode = editIdx >= 0;
+        if (!isEditMode && !holderMode) { closePanel(); return; }
         var old = isEditMode ? model[editIdx] : null;
         var key = isEditMode ? old.key : keyify(document.getElementById("ap-key").value);
         if (!key) { alert("กรุณาตั้งชื่อช่อง (KEY)"); return; }
@@ -297,7 +299,13 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
 
         var kind = document.getElementById("ap-kind").value;
         var label = document.getElementById("ap-label").value.trim() || key;
-        var field = { key: key, label: label, kind: kind, source: "", transform: "raw", transformValue: "", sample: "", inputType: "text", options: "", missing: old ? old.missing : false };
+        var field = {
+          key: key, label: label, kind: kind, source: "", transform: "raw", transformValue: "",
+          sample: "", inputType: "text", options: "",
+          missing: old ? old.missing : false,
+          keep: old ? !!old.keep : holderMode,
+          auto: false
+        };
 
         if (kind === "input") {
           var itype = document.getElementById("ap-inputtype").value;
@@ -311,7 +319,7 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
             field.sample = keepSample ? old.sample : opts[0].value;
           } else {
             field.inputType = "text";
-            field.sample = old && old.kind === "input" ? (old.sample || "") : lastSel.text;
+            field.sample = old && old.kind === "input" ? (old.sample || "") : "";
           }
         } else {
           var source = document.getElementById("ap-source").value;
@@ -324,10 +332,7 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         if (isEditMode) {
           model[editIdx] = field;
         } else {
-          var token = "{{" + key + "}}";
-          srcEl.value = srcEl.value.slice(0, lastSel.start) + token + srcEl.value.slice(lastSel.end);
           model.push(field);
-          lastSel = { start: 0, end: 0, text: "" };
         }
         closePanel();
         syncModelFromText();
@@ -350,7 +355,7 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
           var tr0 = document.createElement("tr");
           var td0 = document.createElement("td");
           td0.colSpan = 5; td0.className = "muted";
-          td0.textContent = "ยังไม่มีช่อง — พิมพ์ {{KEY}} ในคอนฟิก หรือลากคลุมคำแล้วกดปุ่มด้านบน";
+          td0.textContent = "ยังไม่มีช่อง — พิมพ์ {{KEY}} ลงในคอนฟิกได้เลย";
           tr0.appendChild(td0); tb.appendChild(tr0); return;
         }
         model.forEach(function (f, idx) {
@@ -359,7 +364,7 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
           var c1 = document.createElement("td");
           var lbl = document.createElement("input");
           lbl.type = "text"; lbl.value = f.label || ""; lbl.placeholder = f.key; lbl.style.width = "140px";
-          lbl.addEventListener("input", function () { f.label = lbl.value; });
+          lbl.addEventListener("input", function () { f.label = lbl.value; f.auto = false; });
           c1.appendChild(lbl);
           var keyTag = document.createElement("div");
           keyTag.className = "muted";
@@ -373,6 +378,17 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
             warn.className = "field-warn";
             warn.textContent = "ไม่พบใน config — จะไม่ถูกบันทึก";
             c1.appendChild(warn);
+            var keepBtn = document.createElement("button");
+            keepBtn.type = "button"; keepBtn.className = "mini-btn"; keepBtn.textContent = "เก็บไว้";
+            keepBtn.title = "เก็บช่องนี้ไว้เป็นช่องพักค่า แม้ไม่อยู่ใน config";
+            keepBtn.style.marginTop = "4px";
+            keepBtn.addEventListener("click", function () { f.keep = true; f.missing = false; f.auto = false; renderList(); });
+            c1.appendChild(keepBtn);
+          } else if (f.keep && !textTokens[f.key]) {
+            var note = document.createElement("span");
+            note.className = "field-note";
+            note.textContent = "ช่องเก็บค่า — ไม่แสดงใน config";
+            c1.appendChild(note);
           }
           tr.appendChild(c1);
           var c3 = document.createElement("td");
@@ -390,12 +406,12 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
               if (o.value === f.sample) op.selected = true;
               sel.appendChild(op);
             });
-            sel.addEventListener("change", function () { f.sample = sel.value; renderPreview(); });
+            sel.addEventListener("change", function () { f.sample = sel.value; f.auto = false; renderPreview(); });
             c4.appendChild(sel);
           } else if (f.kind === "input") {
             var inp = document.createElement("input");
             inp.type = "text"; inp.value = f.sample || ""; inp.placeholder = "ค่าตัวอย่าง"; inp.style.width = "150px";
-            inp.addEventListener("input", function () { f.sample = inp.value; renderPreview(); });
+            inp.addEventListener("input", function () { f.sample = inp.value; f.auto = false; renderPreview(); });
             c4.appendChild(inp);
           } else { c4.className = "muted"; c4.textContent = "(อัตโนมัติ)"; }
           tr.appendChild(c4);
@@ -423,6 +439,7 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
       function moveField(idx, dir) {
         var to = idx + dir;
         if (to < 0 || to >= model.length) return;
+        model[idx].auto = false;
         var tmp = model[idx];
         model[idx] = model[to];
         model[to] = tmp;
@@ -514,23 +531,34 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         var re = /\\{\\{([A-Z0-9_]+)\\}\\}/g;
         var m;
         while ((m = re.exec(srcEl.value))) found[m[1]] = true;
+        textTokens = found;
         var known = {};
-        model.forEach(function (f) { known[f.key] = true; f.missing = !found[f.key]; });
+        model.forEach(function (f) { known[f.key] = true; f.missing = !found[f.key] && !f.keep; });
         Object.keys(found).forEach(function (key) {
           if (known[key]) return;
-          model.push({ key: key, label: key, kind: "input", source: "", transform: "raw", transformValue: "", sample: "", inputType: "text", options: "", missing: false });
+          model.push({ key: key, label: key, kind: "input", source: "", transform: "raw", transformValue: "", sample: "", inputType: "text", options: "", missing: false, keep: false, auto: true });
         });
         // ช่องที่ไม่อยู่ในเนื้อ config แต่ถูกช่องอื่นดึงค่าไปใช้ ยังถือว่าใช้งานอยู่
         model.forEach(function (f) {
           if (f.missing || !f.source) return;
           model.forEach(function (s) { if (s.key === f.source) s.missing = false; });
         });
+        // ช่องที่ระบบสร้างเองแล้ว token หายไป (เช่น เศษจากการพิมพ์ {{A}} → {{AAA}})
+        // ถ้ายังไม่เคยถูกแก้อะไรเลย ลบทิ้งให้อัตโนมัติ
+        for (var i = model.length - 1; i >= 0; i--) {
+          if (model[i].missing && model[i].auto) model.splice(i, 1);
+        }
       }
 
+      var syncTimer = null;
       srcEl.addEventListener("input", function () {
-        syncModelFromText();
-        renderList();
         renderPreview();
+        clearTimeout(syncTimer);
+        syncTimer = setTimeout(function () {
+          syncModelFromText();
+          renderList();
+          renderPreview();
+        }, 400);
       });
 
       function prepareSubmit() {

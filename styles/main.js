@@ -1159,6 +1159,14 @@ tr.row-missing td { opacity: 0.55; }
   color: #c98a00;
 }
 
+.field-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
 @media (max-width: 960px) {
   .config-live-grid { grid-template-columns: 1fr; }
 }
