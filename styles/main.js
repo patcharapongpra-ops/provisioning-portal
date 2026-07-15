@@ -1104,17 +1104,15 @@ textarea:focus-visible {
 /* ------------------------------------------------------------------ */
 /* Config Generator — live preview                                     */
 /* ------------------------------------------------------------------ */
-.config-live-grid {
+.config-fields-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 360px) minmax(0, 1fr);
-  gap: 22px;
-  align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 18px;
+  margin-bottom: 16px;
 }
 
-.stack-fields {
-  display: grid;
-  gap: 14px;
-  align-content: start;
+@media (max-width: 700px) {
+  .config-fields-grid { grid-template-columns: 1fr; }
 }
 
 .pv-slot {
@@ -1167,9 +1165,14 @@ tr.row-missing td { opacity: 0.55; }
   color: var(--ink-3);
 }
 
-@media (max-width: 960px) {
-  .config-live-grid { grid-template-columns: 1fr; }
-}
+tr.drag-over td { box-shadow: inset 0 2px 0 var(--accent); }
+
+/* ฟอร์มจำลองหน้า user ในหน้าแก้ไข template — ลากจัดลำดับได้ */
+.uf-item { cursor: grab; }
+.uf-item:active { cursor: grabbing; }
+.uf-item input, .uf-item select { pointer-events: none; }
+.uf-item.dragging { opacity: 0.5; }
+.uf-item.drag-over { box-shadow: inset 0 2px 0 var(--accent); border-radius: var(--r-sm); }
 
 /* Template editor — config source + field table side by side */
 .tpl-config-panel { overflow: visible; }

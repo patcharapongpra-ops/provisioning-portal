@@ -71,7 +71,7 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         <div class="panel-title-row">
           <div>
             <h2>Config</h2>
-            <p class="muted">พิมพ์ {{KEY}} ในเนื้อ config ได้เลย ช่องจะโผล่ในตารางเอง · ปุ่มขวาไว้สร้างช่องพักค่าให้ช่องอื่นดึงต่อ</p>
+            <p class="muted">พิมพ์ {{KEY}} ในเนื้อ config ได้เลย ช่องจะโผล่ในตารางเอง · ลาก ⋮⋮ จัดลำดับช่องที่ user จะกรอกในหน้า Config Generator</p>
           </div>
           <div class="action-row">
             <button type="button" class="small-btn" onclick="openHolder()">＋ ช่องเก็บค่า (ไม่แสดงใน config)</button>
@@ -150,6 +150,12 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
       </section>
 
       <section class="panel">
+        <h2>ฟอร์มที่ user จะเห็น</h2>
+        <p class="muted">หน้าตาเดียวกับหน้า Config Generator จริง · ลากช่องเพื่อจัดลำดับก่อน-หลังได้เลย</p>
+        <div id="user-form-preview" class="config-fields-grid"></div>
+      </section>
+
+      <section class="panel">
         <h2>ตัวอย่างผลลัพธ์ (Preview)</h2>
         <p class="muted">จุดสีคือตำแหน่งที่ค่าจะถูกเปลี่ยน — <span class="pv-slot pv-filled">เขียว</span> จากช่องกรอก · <span class="pv-slot pv-derived">ฟ้า</span> คำนวณอัตโนมัติ · <span class="pv-slot pv-missing">เหลือง</span> ยังไม่มีค่าตัวอย่าง</p>
         <pre id="preview" class="config-output"></pre>
@@ -168,6 +174,8 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
       var editIdx = -1;
       var holderMode = false;
       var textTokens = {};
+      var dragIdx = null;
+      var ufDragIdx = null;
 
       var TRANSFORMS = [
         ["raw", "ใช้ค่าตรง"],
@@ -356,7 +364,9 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
           var td0 = document.createElement("td");
           td0.colSpan = 5; td0.className = "muted";
           td0.textContent = "ยังไม่มีช่อง — พิมพ์ {{KEY}} ลงในคอนฟิกได้เลย";
-          tr0.appendChild(td0); tb.appendChild(tr0); return;
+          tr0.appendChild(td0); tb.appendChild(tr0);
+          renderUserForm();
+          return;
         }
         model.forEach(function (f, idx) {
           var tr = document.createElement("tr");
@@ -417,13 +427,34 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
           tr.appendChild(c4);
           var cm = document.createElement("td");
           var mv = document.createElement("div"); mv.className = "move-btns";
-          var up = document.createElement("button"); up.type = "button"; up.className = "mini-btn"; up.textContent = "↑";
-          up.disabled = idx === 0;
-          up.addEventListener("click", function () { moveField(idx, -1); });
-          var dn = document.createElement("button"); dn.type = "button"; dn.className = "mini-btn"; dn.textContent = "↓";
-          dn.disabled = idx === model.length - 1;
-          dn.addEventListener("click", function () { moveField(idx, 1); });
-          mv.appendChild(up); mv.appendChild(dn); cm.appendChild(mv); tr.appendChild(cm);
+          var hd = document.createElement("span");
+          hd.className = "drag-handle"; hd.textContent = "⋮⋮"; hd.title = "ลากเพื่อจัดลำดับ";
+          hd.draggable = true;
+          hd.addEventListener("dragstart", function (e) {
+            dragIdx = idx;
+            tr.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+            try { e.dataTransfer.setData("text/plain", String(idx)); } catch (err) {}
+            if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(tr, 12, 12);
+          });
+          hd.addEventListener("dragend", function () { dragIdx = null; tr.classList.remove("dragging"); });
+          tr.addEventListener("dragover", function (e) {
+            if (dragIdx === null || dragIdx === idx) return;
+            e.preventDefault();
+            tr.classList.add("drag-over");
+          });
+          tr.addEventListener("dragleave", function () { tr.classList.remove("drag-over"); });
+          tr.addEventListener("drop", function (e) {
+            if (dragIdx === null || dragIdx === idx) return;
+            e.preventDefault();
+            var it = model.splice(dragIdx, 1)[0];
+            it.auto = false;
+            model.splice(idx, 0, it);
+            dragIdx = null;
+            renderList();
+            renderPreview();
+          });
+          mv.appendChild(hd); cm.appendChild(mv); tr.appendChild(cm);
           var c5 = document.createElement("td");
           var actions = document.createElement("div"); actions.className = "move-btns";
           var ed = document.createElement("button"); ed.type = "button"; ed.className = "mini-btn"; ed.textContent = "แก้ไข";
@@ -434,17 +465,69 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
           c5.appendChild(actions); tr.appendChild(c5);
           tb.appendChild(tr);
         });
+        renderUserForm();
       }
 
-      function moveField(idx, dir) {
-        var to = idx + dir;
-        if (to < 0 || to >= model.length) return;
-        model[idx].auto = false;
-        var tmp = model[idx];
-        model[idx] = model[to];
-        model[to] = tmp;
-        renderList();
-        renderPreview();
+      function renderUserForm() {
+        var wrap = document.getElementById("user-form-preview");
+        if (!wrap) return;
+        wrap.innerHTML = "";
+        var inputs = model.filter(function (f) { return f.kind === "input" && !f.missing; });
+        if (!inputs.length) {
+          var p = document.createElement("p");
+          p.className = "muted";
+          p.textContent = "ยังไม่มีช่องกรอก";
+          wrap.appendChild(p);
+          return;
+        }
+        inputs.forEach(function (f) {
+          var lab = document.createElement("label");
+          lab.className = "uf-item";
+          lab.draggable = true;
+          lab.title = "ลากเพื่อจัดลำดับ";
+          lab.appendChild(document.createTextNode(f.label || f.key));
+          var ctrl;
+          if (f.inputType === "select") {
+            ctrl = document.createElement("select");
+            parseOptions(f.options).forEach(function (o) {
+              var op = document.createElement("option");
+              op.textContent = o.label;
+              ctrl.appendChild(op);
+            });
+          } else {
+            ctrl = document.createElement("input");
+            ctrl.type = "text";
+            ctrl.readOnly = true;
+            ctrl.placeholder = f.sample ? "เช่น " + f.sample : "";
+          }
+          ctrl.tabIndex = -1;
+          lab.appendChild(ctrl);
+
+          lab.addEventListener("dragstart", function (e) {
+            ufDragIdx = model.indexOf(f);
+            lab.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+            try { e.dataTransfer.setData("text/plain", f.key); } catch (err) {}
+          });
+          lab.addEventListener("dragend", function () { ufDragIdx = null; lab.classList.remove("dragging"); });
+          lab.addEventListener("dragover", function (e) {
+            if (ufDragIdx === null || model[ufDragIdx] === f) return;
+            e.preventDefault();
+            lab.classList.add("drag-over");
+          });
+          lab.addEventListener("dragleave", function () { lab.classList.remove("drag-over"); });
+          lab.addEventListener("drop", function (e) {
+            if (ufDragIdx === null || model[ufDragIdx] === f) return;
+            e.preventDefault();
+            var moved = model.splice(ufDragIdx, 1)[0];
+            moved.auto = false;
+            model.splice(model.indexOf(f), 0, moved);
+            ufDragIdx = null;
+            renderList();
+            renderPreview();
+          });
+          wrap.appendChild(lab);
+        });
       }
 
       function ipToNumber(ip) {

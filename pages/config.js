@@ -157,14 +157,15 @@ export function configPage({
       <form action="/config/generate" method="POST" class="admin-form" id="gen-form">
         <input type="hidden" name="template_id" value="${selectedTemplate.id}">
 
-        <div class="config-live-grid">
-          <div class="stack-fields">
-            ${inputFields}
-            <button class="primary-btn" type="submit">Generate Config</button>
-          </div>
-
-          <pre id="live-preview" class="config-output"></pre>
+        <div class="config-fields-grid">
+          ${inputFields}
         </div>
+
+        <div class="action-row" style="margin-bottom:16px">
+          <button class="primary-btn" type="submit">Generate Config</button>
+        </div>
+
+        <pre id="live-preview" class="config-output"></pre>
       </form>
     </section>
     `
