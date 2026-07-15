@@ -219,6 +219,13 @@ async function handleRequest(request, env, ctx) {
         return await handleGenerateConfig(request, env, user);
       }
 
+      if (url.pathname === "/config/history") {
+        const user = await requireLogin(request, env);
+        if (!user) return new Response("unauthorized", { status: 401 });
+        if (request.method !== "POST") return redirect(request, "/config");
+        return await handleLogConfigHistory(request, env, user);
+      }
+
       if (url.pathname === "/admin/templates") {
         const user = await requireLogin(request, env);
         if (!user) return redirect(request, "/login");
@@ -1587,6 +1594,53 @@ async function handleGenerateConfig(request, env, user) {
       inputValues,
     })
   );
+}
+
+// บันทึกประวัติจากหน้า Config Generator (ยิงตอน user กด Copy/ดาวน์โหลด)
+async function handleLogConfigHistory(request, env, user) {
+  let payload;
+  try {
+    payload = await request.json();
+  } catch (e) {
+    return new Response("bad request", { status: 400 });
+  }
+
+  const templateId = Number(payload && payload.template_id);
+  if (!templateId) return new Response("bad request", { status: 400 });
+
+  const data = await loadConfigPageData(env, String(templateId));
+  if (!data.selectedTemplate) return new Response("not found", { status: 404 });
+
+  const inputValues = payload.values && typeof payload.values === "object" ? payload.values : {};
+  const values = {};
+
+  for (const field of data.fields) {
+    if (!field.source_key) {
+      values[field.field_key] = String(inputValues[field.field_key] || "").trim();
+    }
+  }
+
+  for (const field of data.fields) {
+    const sourceKey = field.source_key || field.field_key;
+    const sourceValue = values[sourceKey] ?? "";
+
+    values[field.field_key] = applyTransform(
+      sourceValue,
+      field.transform_type,
+      field.transform_value
+    );
+  }
+
+  const output = renderTemplate(data.selectedTemplate.template_text, values);
+
+  await env.DB
+    .prepare(
+      "INSERT INTO config_history (user_id, template_id, input_json, output_config) VALUES (?, ?, ?, ?)"
+    )
+    .bind(user.id, templateId, JSON.stringify(values), output)
+    .run();
+
+  return new Response(null, { status: 204 });
 }
 
 function renderTemplate(templateText, values) {

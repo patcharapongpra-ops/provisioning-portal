@@ -50,7 +50,13 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
       <input type="hidden" name="fields_json" id="fields_json">
 
       <section class="panel">
-        <h2>ข้อมูล Template</h2>
+        <div class="panel-title-row">
+          <h2>ข้อมูล Template</h2>
+          <div class="action-row">
+            <button type="submit" class="primary-btn">${isEdit ? "บันทึกการแก้ไข" : "สร้าง Template"}</button>
+            <a class="secondary-link-btn" href="/admin/templates">ยกเลิก</a>
+          </div>
+        </div>
         <div class="form-row">
           <label>Device Type
             <input name="device_type_name" type="text" placeholder="เช่น Router, Switch" value="${escapeHtml(t.device_type_name || "")}" required>
@@ -161,10 +167,6 @@ export function adminTemplateFormPage({ user, mode, template, fields, error }) {
         <pre id="preview" class="config-output"></pre>
       </section>
 
-      <section class="panel">
-        <button type="submit" class="primary-btn">${isEdit ? "บันทึกการแก้ไข" : "สร้าง Template"}</button>
-        <a class="secondary-link-btn" href="/admin/templates">ยกเลิก</a>
-      </section>
     </form>
 
     <script id="init-data" type="application/json">${initJson}</script>

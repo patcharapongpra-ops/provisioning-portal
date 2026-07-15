@@ -92,6 +92,8 @@ export function configPage({
 
   const liveData = selectedTemplate
     ? {
+        id: selectedTemplate.id,
+        fileName: fileSafeName(selectedTemplate.name),
         text: selectedTemplate.template_text || "",
         fields: fields.map((field) => ({
           key: field.field_key,
@@ -151,64 +153,21 @@ export function configPage({
             selectedTemplate.device_type_name || "General"
           )} · คลิกช่องสีเหลืองใน preview เพื่อกระโดดไปกรอก</p>
         </div>
-        <span id="live-status" class="live-status"></span>
+        <div class="action-row">
+          <span id="live-status" class="live-status"></span>
+          <button type="button" class="small-btn" onclick="copyConfig()">Copy</button>
+          <button type="button" class="small-btn" onclick="downloadConfig()">ดาวน์โหลด .txt</button>
+        </div>
       </div>
 
-      <form action="/config/generate" method="POST" class="admin-form" id="gen-form">
-        <input type="hidden" name="template_id" value="${selectedTemplate.id}">
-
+      <form class="admin-form" id="gen-form" onsubmit="return false">
         <div class="config-fields-grid">
           ${inputFields}
-        </div>
-
-        <div class="action-row" style="margin-bottom:16px">
-          <button class="primary-btn" type="submit">Generate Config</button>
         </div>
 
         <pre id="live-preview" class="config-output"></pre>
       </form>
     </section>
-    `
-        : ""
-    }
-
-    ${
-      output
-        ? `
-    <section class="panel" id="result-panel">
-      <div class="panel-title-row">
-        <h2>Result Config</h2>
-        <div class="action-row">
-          <button class="small-btn" onclick="copyConfig()">Copy</button>
-          <button class="small-btn" onclick="downloadConfig()">ดาวน์โหลด .txt</button>
-        </div>
-      </div>
-
-      <pre id="config-output" class="config-output">${escapeHtml(output)}</pre>
-    </section>
-
-    <script>
-      function copyConfig() {
-        const text = document.getElementById("config-output").innerText;
-        navigator.clipboard.writeText(text);
-        alert("Copied config");
-      }
-      function downloadConfig() {
-        var text = document.getElementById("config-output").innerText;
-        var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-        var d = new Date();
-        function pad(n) { return (n < 10 ? "0" : "") + n; }
-        var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes());
-        var a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = ${JSON.stringify(fileSafeName(selectedTemplate ? selectedTemplate.name : "config"))} + "_" + stamp + ".txt";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-      }
-      document.getElementById("result-panel").scrollIntoView({ behavior: "smooth" });
-    </script>
     `
         : ""
     }
@@ -225,6 +184,7 @@ export function configPage({
 
         var byKey = {};
         DATA.fields.forEach(function (f) { byKey[f.key] = f; });
+        var lastMissing = 0;
 
         function ipToNumber(ip) {
           var p = String(ip).split(".").map(Number);
@@ -323,6 +283,7 @@ export function configPage({
           if (last < DATA.text.length) pre.appendChild(document.createTextNode(DATA.text.slice(last)));
 
           var missing = DATA.fields.filter(function (f) { return f.input && !values[f.key]; }).length;
+          lastMissing = missing;
           if (missing) {
             statusEl.className = "live-status";
             statusEl.textContent = "\\u0E40\\u0E2B\\u0E25\\u0E37\\u0E2D\\u0E2D\\u0E35\\u0E01 " + missing + " \\u0E0A\\u0E48\\u0E2D\\u0E07";
@@ -339,6 +300,44 @@ export function configPage({
           el.addEventListener("input", renderLive);
           el.addEventListener("change", renderLive);
         });
+
+        function confirmIfIncomplete() {
+          if (lastMissing > 0) return confirm("\\u0E22\\u0E31\\u0E07\\u0E01\\u0E23\\u0E2D\\u0E01\\u0E44\\u0E21\\u0E48\\u0E04\\u0E23\\u0E1A " + lastMissing + " \\u0E0A\\u0E48\\u0E2D\\u0E07 \\u0E40\\u0E2D\\u0E32\\u0E15\\u0E48\\u0E2D\\u0E40\\u0E25\\u0E22\\u0E44\\u0E2B\\u0E21?");
+          return true;
+        }
+
+        function sendHistory() {
+          try {
+            fetch("/config/history", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ template_id: DATA.id, values: computeValues() })
+            }).catch(function () {});
+          } catch (e) {}
+        }
+
+        window.copyConfig = function () {
+          if (!confirmIfIncomplete()) return;
+          navigator.clipboard.writeText(pre.textContent);
+          sendHistory();
+          alert("Copied config");
+        };
+
+        window.downloadConfig = function () {
+          if (!confirmIfIncomplete()) return;
+          var blob = new Blob([pre.textContent], { type: "text/plain;charset=utf-8" });
+          var d = new Date();
+          function pad(n) { return (n < 10 ? "0" : "") + n; }
+          var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes());
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = DATA.fileName + "_" + stamp + ".txt";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+          sendHistory();
+        };
 
         renderLive();
       })();
